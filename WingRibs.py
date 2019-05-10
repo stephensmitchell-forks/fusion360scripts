@@ -38,53 +38,48 @@ def plane(comp):
     return comp.xZConstructionPlane
 
 
-def create_rib(wingBody, rootSketch, component, compOccurrence, dist_from_root, thickness, rib_name):
-    rootPlane = rootSketch.referencePlane
-   # tipPlane = tipSketch.referencePlane
+def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_root, thickness, rib_name):
+    root_plane = root_sketch.referencePlane
 
     # Create 2 construction planes:
     #   1) offset from root sketch plane
     #   2) offset from the first
     planes = component.constructionPlanes
 
-    plane1Input = planes.createInput()
-    plane1Input.setByOffset(rootPlane, ValueInput.createByString(dist_from_root))
-    plane1 = planes.add(plane1Input)
+    plane1_input = planes.createInput()
+    plane1_input.setByOffset(root_plane, ValueInput.createByString(dist_from_root))
+    plane1 = planes.add(plane1_input)
 
-    plane2Input = planes.createInput()
-    plane2Input.setByOffset(plane1, ValueInput.createByString(thickness))
-    plane2 = planes.add(plane2Input)
+    plane2_input = planes.createInput()
+    plane2_input.setByOffset(plane1, ValueInput.createByString(thickness))
+    plane2 = planes.add(plane2_input)
 
     # Create rib as using boundary fill, between the 2 construction planes, and the wing body
-    boundaryFills = component.features.boundaryFillFeatures
+    boundary_fills = component.features.boundaryFillFeatures
     tools = ObjectCollection.create()
-    tools.add(wingBody)
+    tools.add(wing_body)
     tools.add(plane1)
     tools.add(plane2)
 
-    boundaryFillInput = boundaryFills.createInput(tools, FeatureOperations.NewBodyFeatureOperation)
+    boundary_fill_input = boundary_fills.createInput(tools, FeatureOperations.NewBodyFeatureOperation)
     try:
-
         # Boundary fill will be created in sub component
-        boundaryFillInput.creationOccurrence = compOccurrence
+        boundary_fill_input.creationOccurrence = comp_occurrence
 
         # Specify which cell is kept
-        assert boundaryFillInput.bRepCells.count == 3, "expected 3 cells"
+        assert boundary_fill_input.bRepCells.count == 3, "expected 3 cells"
 
-        # volumes = [cell.cellBody.volume for cell in boundaryFillInput.bRepCells]
-        # log('Volumes: {}'.format(volumes))
-
-        cell = cell_in_the_middle(boundaryFillInput.bRepCells)
+        cell = cell_in_the_middle(boundary_fill_input.bRepCells)
         cell.isSelected = True
 
         # Create the boundary fill, based on the input data object
-        boundaryFillFeature = boundaryFills.add(boundaryFillInput)
-        assert 1 == boundaryFillFeature.bodies.count, 'expected a single rib body to be created'
-        ribBody = boundaryFillFeature.bodies.item(0)
+        boundary_fill_feature = boundary_fills.add(boundary_fill_input)
+        assert 1 == boundary_fill_feature.bodies.count, 'expected a single rib body to be created'
+        ribBody = boundary_fill_feature.bodies.item(0)
         ribBody.name = rib_name
     except:
         # rollback the boundary fill transaction
-        boundaryFillInput.cancel()
+        boundary_fill_input.cancel()
         raise
     # end of create_rib
     # ----------------------------------
