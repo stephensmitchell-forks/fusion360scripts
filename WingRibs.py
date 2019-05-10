@@ -38,7 +38,7 @@ def plane(comp):
     return comp.xZConstructionPlane
 
 
-def create_rib(wingBody, rootSketch, component, compOccurrence, dist_from_root, thickness):
+def create_rib(wingBody, rootSketch, component, compOccurrence, dist_from_root, thickness, rib_name):
     rootPlane = rootSketch.referencePlane
    # tipPlane = tipSketch.referencePlane
 
@@ -78,7 +78,10 @@ def create_rib(wingBody, rootSketch, component, compOccurrence, dist_from_root, 
         cell.isSelected = True
 
         # Create the boundary fill, based on the input data object
-        boundaryFills.add(boundaryFillInput)
+        boundaryFillFeature = boundaryFills.add(boundaryFillInput)
+        assert 1 == boundaryFillFeature.bodies.count, 'expected a single rib body to be created'
+        ribBody = boundaryFillFeature.bodies.item(0)
+        ribBody.name = rib_name
     except:
         # rollback the boundary fill transaction
         boundaryFillInput.cancel()
@@ -121,8 +124,9 @@ def run(context):
         ribs.name = 'ribs'
 
         # now create the ribs
-        for rs in RIB_STATIONS:
-            create_rib(wingBody, rootSketch, ribs, ribsOcc, '{} mm'.format(rs), RIB_THICKNESS)
+        for rib_id, rs in enumerate(RIB_STATIONS):
+            rib_name = "rib_{}".format(rib_id+1)
+            create_rib(wingBody, rootSketch, ribs, ribsOcc, '{} mm'.format(rs), RIB_THICKNESS, rib_name)
 
     except:
         msg = 'Failed:\n{}'.format(traceback.format_exc())
