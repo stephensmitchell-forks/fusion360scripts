@@ -14,7 +14,7 @@ TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
 # rib locations in mm
-RIB_STATIONS = [x + 5 for x in range(0, 40, 10)]
+RIB_STATIONS = [25] #[x + 5 for x in range(0, 40, 10)]
 RIB_THICKNESS = "1 mm"
 
 LOGFILE = '/Users/andy/logs/create-ribs.log'
@@ -36,6 +36,55 @@ def log(*msgs):
 
 def plane(comp):
     return comp.xZConstructionPlane
+
+
+def create_rib(wingBody, rootSketch, component, compOccurrence, dist_from_root, thickness):
+    rootPlane = rootSketch.referencePlane
+   # tipPlane = tipSketch.referencePlane
+
+    # Create 2 construction planes:
+    #   1) offset from root sketch plane
+    #   2) offset from the first
+    planes = component.constructionPlanes
+
+    plane1Input = planes.createInput()
+    plane1Input.setByOffset(rootPlane, ValueInput.createByString(dist_from_root))
+    plane1 = planes.add(plane1Input)
+
+    plane2Input = planes.createInput()
+    plane2Input.setByOffset(plane1, ValueInput.createByString(thickness))
+    plane2 = planes.add(plane2Input)
+
+    # Create rib as using boundary fill, between the 2 construction planes, and the wing body
+    boundaryFills = component.features.boundaryFillFeatures
+    tools = ObjectCollection.create()
+    tools.add(wingBody)
+    tools.add(plane1)
+    tools.add(plane2)
+
+    boundaryFillInput = boundaryFills.createInput(tools, FeatureOperations.NewBodyFeatureOperation)
+    try:
+
+        # Boundary fill will be created in sub component
+        boundaryFillInput.creationOccurrence = compOccurrence
+
+        # Specify which cell is kept
+        assert boundaryFillInput.bRepCells.count == 3, "expected 3 cells"
+
+        # volumes = [cell.cellBody.volume for cell in boundaryFillInput.bRepCells]
+        # log('Volumes: {}'.format(volumes))
+
+        cell = cell_in_the_middle(boundaryFillInput.bRepCells)
+        cell.isSelected = True
+
+        # Create the boundary fill, based on the input data object
+        boundaryFills.add(boundaryFillInput)
+    except:
+        # rollback the boundary fill transaction
+        boundaryFillInput.cancel()
+        raise
+    # end of create_rib
+    # ----------------------------------
 
 
 def run(context):
@@ -71,57 +120,9 @@ def run(context):
         ribs = Component.cast(ribsOcc.component)
         ribs.name = 'ribs'
 
-        def create_rib(dist_from_root, thickness):
-            rootPlane = rootSketch.referencePlane
-            tipPlane = tipSketch.referencePlane
-
-            # Create 2 construction planes: 
-            #   1) offset from root sketch plane
-            #   2) offset from the first
-            planes = ribs.constructionPlanes
-
-            plane1Input = planes.createInput()
-            plane1Input.setByOffset(rootPlane, ValueInput.createByString(dist_from_root))
-            plane1 = planes.add(plane1Input)
-
-            plane2Input = planes.createInput()
-            plane2Input.setByOffset(plane1, ValueInput.createByString(thickness))
-            plane2 = planes.add(plane2Input)
-
-            # Create rib as using boundary fill, between the 2 construction planes, and the wing body
-            boundaryFills = ribs.features.boundaryFillFeatures
-            tools = ObjectCollection.create()
-            tools.add(wingBody)
-            tools.add(plane1)
-            tools.add(plane2)
-
-            boundaryFillInput = boundaryFills.createInput(tools, FeatureOperations.NewBodyFeatureOperation)
-            try:
-
-                # Boundary fill will be created in sub component
-                boundaryFillInput.creationOccurrence = ribsOcc
-
-                # Specify which cell is kept
-                assert boundaryFillInput.bRepCells.count == 3, "expected 3 cells"
-
-                # volumes = [cell.cellBody.volume for cell in boundaryFillInput.bRepCells]
-                # log('Volumes: {}'.format(volumes))
-
-                cell = cell_in_the_middle(boundaryFillInput.bRepCells)
-                cell.isSelected = True
-
-                # Create the boundary fill, based on the input data object
-                boundaryFills.add(boundaryFillInput)
-            except:
-                # rollback the boundary fill transaction
-                boundaryFillInput.cancel()
-                raise
-            # end of create_rib
-            # ----------------------------------
-
         # now create the ribs
         for rs in RIB_STATIONS:
-            create_rib('{} mm'.format(rs), RIB_THICKNESS)
+            create_rib(wingBody, rootSketch, ribs, ribsOcc, '{} mm'.format(rs), RIB_THICKNESS)
 
     except:
         msg = 'Failed:\n{}'.format(traceback.format_exc())
