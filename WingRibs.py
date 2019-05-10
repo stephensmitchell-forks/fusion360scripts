@@ -41,6 +41,15 @@ def plane(comp):
 def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_root, thickness, rib_name):
     root_plane = root_sketch.referencePlane
 
+    # Create rib as using boundary fill, between the 2 construction planes, and the wing body
+    rib_body = create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, thickness)
+    rib_body.name = rib_name
+
+
+def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, thickness):
+    """
+    Creates a solid rib body using a boundary fill between the 2 planes
+    """
     # Create 2 construction planes:
     #   1) offset from root sketch plane
     #   2) offset from the first
@@ -54,13 +63,11 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
     plane2_input.setByOffset(plane1, ValueInput.createByString(thickness))
     plane2 = planes.add(plane2_input)
 
-    # Create rib as using boundary fill, between the 2 construction planes, and the wing body
     boundary_fills = component.features.boundaryFillFeatures
     tools = ObjectCollection.create()
     tools.add(wing_body)
     tools.add(plane1)
     tools.add(plane2)
-
     boundary_fill_input = boundary_fills.createInput(tools, FeatureOperations.NewBodyFeatureOperation)
     try:
         # Boundary fill will be created in sub component
@@ -75,14 +82,12 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
         # Create the boundary fill, based on the input data object
         boundary_fill_feature = boundary_fills.add(boundary_fill_input)
         assert 1 == boundary_fill_feature.bodies.count, 'expected a single rib body to be created'
-        ribBody = boundary_fill_feature.bodies.item(0)
-        ribBody.name = rib_name
+        rib_body = boundary_fill_feature.bodies.item(0)
+        return rib_body
     except:
         # rollback the boundary fill transaction
         boundary_fill_input.cancel()
         raise
-    # end of create_rib
-    # ----------------------------------
 
 
 def run(context):
