@@ -14,8 +14,12 @@ TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
 # rib locations in mm
-RIB_STATIONS = [25] #[x + 5 for x in range(0, 40, 10)]
+RIB_STATIONS = [5,15,25,35] #[x + 5 for x in range(0, 40, 10)]
+# spanwise thickness of rib
 RIB_THICKNESS = "1 mm"
+# inset of rib from surface
+RIB_INSET = "1.2 mm"
+
 
 LOGFILE = '/Users/andy/logs/create-ribs.log'
 
@@ -38,25 +42,40 @@ def plane(comp):
     return comp.xZConstructionPlane
 
 
-def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_root, thickness, rib_name):
+def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_root, rib_thickness, rib_inset, rib_name):
     root_plane = root_sketch.referencePlane
 
     # Create rib as using boundary fill, between the 2 construction planes, and the wing body
-    rib_body, plane1, plane2 = create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, thickness)
+    rib_body, plane1, plane2 = create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, rib_thickness)
     rib_body.name = rib_name
 
-    log("face count:",rib_body.faces.count)
-    for i, face in enumerate(rib_body.faces):
-        #log("face",i, face.geometry.surfaceType)
-        if face.geometry.surfaceType == SurfaceTypes.PlaneSurfaceType:
-            #log('face',i,'is planar')
-            face_plane = Plane.cast(face.geometry)
-            #log('face plane', face_plane)
-            if face_plane.isCoPlanarTo(plane1.geometry):
-                log(i,'is coplanar with plane1')
+    # find the faces aligned with the construction planes
+    plane1_face = find_coplanar_face(rib_body, plane1)
+    plane2_face = find_coplanar_face(rib_body, plane2)
+    assert plane1_face is not None, 'plane1'
+    assert plane2_face is not None, 'plane2'
 
-            if face_plane.isCoPlanarTo(plane2.geometry):
-                log(i,'is coplanar with plane2')
+    # use shell tool to remove center of rib, and the 2 faces
+    # Create a collection of entities for shell
+    entities1 = ObjectCollection.create()
+    entities1.add(plane1_face)
+    entities1.add(plane2_face)
+
+    # Create a shell feature
+    shellFeats = component.features.shellFeatures
+    isTangentChain = False
+    shellFeatureInput = shellFeats.createInput(entities1, isTangentChain)
+    rib_thickness = ValueInput.createByString(rib_inset)
+    shellFeatureInput.insideThickness = rib_thickness
+    shellFeats.add(shellFeatureInput)
+
+
+def find_coplanar_face(body, plane):
+    for face in body.faces:
+        if face.geometry.surfaceType == SurfaceTypes.PlaneSurfaceType:
+            face_plane = Plane.cast(face.geometry)
+            if face_plane.isCoPlanarTo(plane.geometry):
+                return face
 
 
 def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, thickness):
@@ -139,7 +158,7 @@ def run(context):
         # now create the ribs
         for rib_id, rs in enumerate(RIB_STATIONS):
             rib_name = "rib_{}".format(rib_id+1)
-            create_rib(wingBody, rootSketch, ribs, ribsOcc, '{} mm'.format(rs), RIB_THICKNESS, rib_name)
+            create_rib(wingBody, rootSketch, ribs, ribsOcc, '{} mm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name)
 
     except:
         msg = 'Failed:\n{}'.format(traceback.format_exc())
