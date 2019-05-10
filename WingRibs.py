@@ -4,7 +4,7 @@
 import datetime as dt
 import traceback
 
-from adsk.core import Application, Matrix3D, Point3D, Vector3D, ValueInput, ObjectCollection
+from adsk.core import Application, Matrix3D, Point3D, Vector3D, ValueInput, ObjectCollection, SurfaceTypes, Plane
 from adsk.fusion import Design, Component, FeatureOperations
 
 ui = None
@@ -42,8 +42,21 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
     root_plane = root_sketch.referencePlane
 
     # Create rib as using boundary fill, between the 2 construction planes, and the wing body
-    rib_body = create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, thickness)
+    rib_body, plane1, plane2 = create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, thickness)
     rib_body.name = rib_name
+
+    log("face count:",rib_body.faces.count)
+    for i, face in enumerate(rib_body.faces):
+        #log("face",i, face.geometry.surfaceType)
+        if face.geometry.surfaceType == SurfaceTypes.PlaneSurfaceType:
+            #log('face',i,'is planar')
+            face_plane = Plane.cast(face.geometry)
+            #log('face plane', face_plane)
+            if face_plane.isCoPlanarTo(plane1.geometry):
+                log(i,'is coplanar with plane1')
+
+            if face_plane.isCoPlanarTo(plane2.geometry):
+                log(i,'is coplanar with plane2')
 
 
 def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, thickness):
@@ -83,7 +96,7 @@ def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from
         boundary_fill_feature = boundary_fills.add(boundary_fill_input)
         assert 1 == boundary_fill_feature.bodies.count, 'expected a single rib body to be created'
         rib_body = boundary_fill_feature.bodies.item(0)
-        return rib_body
+        return rib_body, plane1, plane2
     except:
         # rollback the boundary fill transaction
         boundary_fill_input.cancel()
@@ -143,7 +156,6 @@ def cell_in_the_middle(cells):
     bounding_boxes = [c.cellBody.boundingBox for c in cells]
     centroids = [centroid_of_bounding_box(bb) for bb in bounding_boxes]
     idx = index_of_point_in_middle(centroids)
-    log("index of point in middle", idx)
     return cells[idx]
 
 
@@ -178,18 +190,9 @@ def index_of_point_in_middle(points):
         ac.subtract(a)
         ac.normalize()
         dot = ab.dotProduct(ac)
-        # log()
-        # log('i=', i)
-        # log('a', a)
-        # log('b', b)
-        # log('c', c)
-        # log('ab', ab)
-        # log('ac', ac)
-        # log('dot', dot)
-
         dots.append(dot)
 
-    log("dots: {}".format(dots))
+    #log("dots: {}".format(dots))
 
     negative_dots = [d for d in dots if d < 0]
     assert len(negative_dots) == 1, "expected exactly 1 negative dot product."
