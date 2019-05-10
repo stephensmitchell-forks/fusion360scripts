@@ -13,8 +13,8 @@ ROOT_SKETCH = 'root-profile'
 TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
-# rib locations in mm
-RIB_STATIONS = [5,15,25,35] #[x + 5 for x in range(0, 40, 10)]
+# rib locations in mm spanwise from root.
+RIB_STATIONS = [15]
 # spanwise thickness of rib
 RIB_THICKNESS = "1 mm"
 # inset of rib from surface
@@ -40,6 +40,9 @@ def log(*msgs):
 
 def plane(comp):
     return comp.xZConstructionPlane
+
+def chordwise_coord(point):
+    return point.x
 
 
 def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_root, rib_thickness, rib_inset, rib_name):
@@ -146,9 +149,15 @@ def run(context):
             raise ValueError('Tip sketch "{}" not found'.format(TIP_SKETCH))
 
         # locate the wing body
-        wingBody = root.bRepBodies.itemByName(WING_BODY)
-        if wingBody is None:
+        wing_body = root.bRepBodies.itemByName(WING_BODY)
+        if wing_body is None:
             raise ValueError('Wing body "{}" not found'.format(WING_BODY))
+
+        # find the chordwise extremities of the wing body
+        start_coord = chordwise_coord(wing_body.boundingBox.minPoint)
+        end_coord = chordwise_coord(wing_body.boundingBox.maxPoint)
+        chord_length = end_coord - start_coord
+        log('start, end, chord length', start_coord, end_coord, chord_length)
 
         # create new component = 'ribs'
         ribsOcc = root.occurrences.addNewComponent(Matrix3D.create())
@@ -158,7 +167,7 @@ def run(context):
         # now create the ribs
         for rib_id, rs in enumerate(RIB_STATIONS):
             rib_name = "rib_{}".format(rib_id+1)
-            create_rib(wingBody, rootSketch, ribs, ribsOcc, '{} mm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name)
+            create_rib(wing_body, rootSketch, ribs, ribsOcc, '{} mm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name)
 
     except:
         msg = 'Failed:\n{}'.format(traceback.format_exc())
