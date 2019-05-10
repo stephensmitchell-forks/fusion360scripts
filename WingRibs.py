@@ -20,7 +20,6 @@ RIB_THICKNESS = "1 mm"
 # inset of rib from surface
 RIB_INSET = "1.2 mm"
 
-
 LOGFILE = '/Users/andy/logs/create-ribs.log'
 
 
@@ -41,6 +40,7 @@ def log(*msgs):
 def plane(comp):
     return comp.xZConstructionPlane
 
+
 def chordwise_coord(point):
     return point.x
 
@@ -49,7 +49,8 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
     root_plane = root_sketch.referencePlane
 
     # Create rib as using boundary fill, between the 2 construction planes, and the wing body
-    rib_body, plane1, plane2 = create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, rib_thickness)
+    rib_body, plane1, plane2 = create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root,
+                                               rib_thickness)
     rib_body.name = rib_name
 
     # find the faces aligned with the construction planes
@@ -166,7 +167,7 @@ def run(context):
 
         # now create the ribs
         for rib_id, rs in enumerate(RIB_STATIONS):
-            rib_name = "rib_{}".format(rib_id+1)
+            rib_name = "rib_{}".format(rib_id + 1)
             create_rib(wing_body, rootSketch, ribs, ribsOcc, '{} mm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name)
 
     except:
@@ -220,7 +221,7 @@ def index_of_point_in_middle(points):
         dot = ab.dotProduct(ac)
         dots.append(dot)
 
-    #log("dots: {}".format(dots))
+    # log("dots: {}".format(dots))
 
     negative_dots = [d for d in dots if d < 0]
     assert len(negative_dots) == 1, "expected exactly 1 negative dot product."
