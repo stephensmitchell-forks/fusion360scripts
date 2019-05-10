@@ -2,8 +2,8 @@
 # Description-
 
 import datetime as dt
-
 import traceback
+
 from adsk.core import Application, Matrix3D, Point3D, Vector3D, ValueInput, ObjectCollection
 from adsk.fusion import Design, Component, FeatureOperations
 
@@ -14,14 +14,14 @@ TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
 # rib locations in mm
-RIB_STATIONS = [x+5 for x in range (0,40,10)]
+RIB_STATIONS = [x + 5 for x in range(0, 40, 10)]
 RIB_THICKNESS = "1 mm"
 
 LOGFILE = '/Users/andy/logs/create-ribs.log'
 
 
 def convert(x):
-    if type(x)  in (Vector3D, Point3D):
+    if type(x) in (Vector3D, Point3D):
         return "{:.3f},{:.3f},{:.3f}".format(x.x, x.y, x.z)
     return str(x)
 
@@ -39,6 +39,9 @@ def plane(comp):
 
 
 def run(context):
+    """
+    Main entrypoint
+    """
     global ui
     try:
         log('--------------------------------')
@@ -92,7 +95,6 @@ def run(context):
             tools.add(plane1)
             tools.add(plane2)
 
-
             boundaryFillInput = boundaryFills.createInput(tools, FeatureOperations.NewBodyFeatureOperation)
             try:
 
@@ -104,7 +106,6 @@ def run(context):
 
                 # volumes = [cell.cellBody.volume for cell in boundaryFillInput.bRepCells]
                 # log('Volumes: {}'.format(volumes))
-
 
                 cell = cell_in_the_middle(boundaryFillInput.bRepCells)
                 cell.isSelected = True
