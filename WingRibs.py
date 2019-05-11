@@ -13,12 +13,15 @@ ROOT_SKETCH = 'root-profile'
 TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
-# rib locations in mm spanwise from root.
+# rib locations in cm spanwise from root.
 RIB_STATIONS = [15]
 # spanwise thickness of rib
 RIB_THICKNESS = "1 mm"
 # inset of rib from surface
 RIB_INSET = "1.2 mm"
+# chordwise positions of rib verticals in cm (at root position. locations proportional elsewhere)
+RIB_VERTICAL_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
+RIB_POST_WIDTH_CM = 0.15
 
 LOGFILE = '/Users/andy/logs/create-ribs.log'
 
@@ -41,17 +44,70 @@ def plane(comp):
     return comp.xZConstructionPlane
 
 
+def vert_spanwise_plane(comp):
+    return comp.yZConstructionPlane
+
+
 def chordwise_coord(point):
     return point.x
 
 
-def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_root, rib_thickness, rib_inset, rib_name):
+def relative_location(from_loc, to_loc, frac):
+    """
+    returns location that a given fraction of the distance between the from and to points
+    >>> relative_location(0,1,0.5)
+    0.5
+    >>> relative_location(-5,6,1)
+    6
+    >>> relative_location(-5,6,0)
+    -5
+    >>> relative_location(-5,15,0.75)
+    10.0
+    """
+    full_dist = to_loc - from_loc
+    dist = full_dist * frac
+    loc = from_loc + dist
+    return loc
+
+
+def create_rib_vertical_post(component,comp_occurrence, rib_body, rib_post_loc, rib_post_width):
+    """
+    create a vertical rib post
+    """
+    log('creating rib of width', rib_post_width, ' at ', rib_post_loc)
+    # create 2 planes, rib_post_width apart, centered on rib_post_loc
+
+    p1loc = rib_post_loc - (rib_post_width / 2)
+    p2loc = rib_post_loc + (rib_post_width / 2)
+    planes = component.constructionPlanes
+
+    plane1_input = planes.createInput()
+    plane1_input.setByOffset(vert_spanwise_plane(component), ValueInput.createByReal(p1loc))
+    plane1 = planes.add(plane1_input)
+
+    plane2_input = planes.createInput()
+    plane2_input.setByOffset(vert_spanwise_plane(component), ValueInput.createByReal(p2loc))
+    plane2 = planes.add(plane2_input)
+
+    post = boundary_fill_between_planes(component, comp_occurrence, rib_body, plane1, plane2)
+
+
+def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_root, rib_thickness, rib_inset, rib_name,
+               rib_post_relative_positions, rib_post_width):
     root_plane = root_sketch.referencePlane
 
     # Create rib as using boundary fill, between the 2 construction planes, and the wing body
     rib_body, plane1, plane2 = create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root,
                                                rib_thickness)
     rib_body.name = rib_name
+
+    # find the chordwise extremities of the wing body
+    start_coord = chordwise_coord(rib_body.boundingBox.minPoint)
+    end_coord = chordwise_coord(rib_body.boundingBox.maxPoint)
+    rib_post_locs = [relative_location(start_coord, end_coord, frac) for frac in rib_post_relative_positions]
+
+    for rib_post_loc in rib_post_locs:
+        create_rib_vertical_post(component, comp_occurrence, rib_body, rib_post_loc, rib_post_width)
 
     # find the faces aligned with the construction planes
     plane1_face = find_coplanar_face(rib_body, plane1)
@@ -66,12 +122,12 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
     entities1.add(plane2_face)
 
     # Create a shell feature
-    shellFeats = component.features.shellFeatures
-    isTangentChain = False
-    shellFeatureInput = shellFeats.createInput(entities1, isTangentChain)
+    shell_feats = component.features.shellFeatures
+    is_tangent_chain = False
+    shell_feature_input = shell_feats.createInput(entities1, is_tangent_chain)
     rib_thickness = ValueInput.createByString(rib_inset)
-    shellFeatureInput.insideThickness = rib_thickness
-    shellFeats.add(shellFeatureInput)
+    shell_feature_input.insideThickness = rib_thickness
+    shell_feats.add(shell_feature_input)
 
 
 def find_coplanar_face(body, plane):
@@ -99,11 +155,17 @@ def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from
     plane2_input.setByOffset(plane1, ValueInput.createByString(thickness))
     plane2 = planes.add(plane2_input)
 
+    rib_body = boundary_fill_between_planes(component, comp_occurrence, wing_body, plane1, plane2)
+    return rib_body, plane1, plane2
+
+
+def boundary_fill_between_planes(component, comp_occurrence, body, plane1, plane2):
     boundary_fills = component.features.boundaryFillFeatures
     tools = ObjectCollection.create()
-    tools.add(wing_body)
+    tools.add(body)
     tools.add(plane1)
     tools.add(plane2)
+
     boundary_fill_input = boundary_fills.createInput(tools, FeatureOperations.NewBodyFeatureOperation)
     try:
         # Boundary fill will be created in sub component
@@ -119,7 +181,7 @@ def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from
         boundary_fill_feature = boundary_fills.add(boundary_fill_input)
         assert 1 == boundary_fill_feature.bodies.count, 'expected a single rib body to be created'
         rib_body = boundary_fill_feature.bodies.item(0)
-        return rib_body, plane1, plane2
+        return rib_body
     except:
         # rollback the boundary fill transaction
         boundary_fill_input.cancel()
@@ -160,6 +222,10 @@ def run(context):
         chord_length = end_coord - start_coord
         log('start, end, chord length', start_coord, end_coord, chord_length)
 
+        rib_vertical_fracs = [r / chord_length for r in RIB_VERTICAL_ROOT_LOCS_CM]
+        log('rib vertical positions (mm)', RIB_VERTICAL_ROOT_LOCS_CM)
+        log('rib vertical relative positions', rib_vertical_fracs)
+
         # create new component = 'ribs'
         ribsOcc = root.occurrences.addNewComponent(Matrix3D.create())
         ribs = Component.cast(ribsOcc.component)
@@ -168,7 +234,8 @@ def run(context):
         # now create the ribs
         for rib_id, rs in enumerate(RIB_STATIONS):
             rib_name = "rib_{}".format(rib_id + 1)
-            create_rib(wing_body, rootSketch, ribs, ribsOcc, '{} mm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name)
+            create_rib(wing_body, rootSketch, ribs, ribsOcc, '{} mm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name,
+                       rib_vertical_fracs, RIB_POST_WIDTH_CM)
 
     except:
         msg = 'Failed:\n{}'.format(traceback.format_exc())
@@ -230,3 +297,7 @@ def index_of_point_in_middle(points):
     for i in range(len(dots)):
         if dots[i] < 0:
             return i
+
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
