@@ -90,13 +90,14 @@ def create_rib_vertical_post(component,comp_occurrence, rib_body, rib_post_loc, 
     plane2 = planes.add(plane2_input)
 
     post = boundary_fill_between_planes(component, comp_occurrence, rib_body, plane1, plane2)
+    return post
 
 
 def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_root, rib_thickness, rib_inset, rib_name,
                rib_post_relative_positions, rib_post_width):
     root_plane = root_sketch.referencePlane
 
-    # Create rib as using boundary fill, between the 2 construction planes, and the wing body
+    # Create rib body and return it and the 2 construction planes along each fact
     rib_body, plane1, plane2 = create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root,
                                                rib_thickness)
     rib_body.name = rib_name
@@ -106,8 +107,9 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
     end_coord = chordwise_coord(rib_body.boundingBox.maxPoint)
     rib_post_locs = [relative_location(start_coord, end_coord, frac) for frac in rib_post_relative_positions]
 
-    for rib_post_loc in rib_post_locs:
-        create_rib_vertical_post(component, comp_occurrence, rib_body, rib_post_loc, rib_post_width)
+    for i, rib_post_loc in enumerate(rib_post_locs):
+        post = create_rib_vertical_post(component, comp_occurrence, rib_body, rib_post_loc, rib_post_width)
+        post.name = 'rib_post_{}'.format(i+1)
 
     # find the faces aligned with the construction planes
     plane1_face = find_coplanar_face(rib_body, plane1)
@@ -140,7 +142,7 @@ def find_coplanar_face(body, plane):
 
 def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, thickness):
     """
-    Creates a solid rib body using a boundary fill between the 2 planes
+    Creates 2 construction planes and a solid rib body using a boundary fill between the 2 planes and the wing body
     """
     # Create 2 construction planes:
     #   1) offset from root sketch plane
