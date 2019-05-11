@@ -14,7 +14,7 @@ TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
 # rib locations in cm spanwise from root.
-RIB_STATIONS = [5,20]
+RIB_STATIONS = [0, 20]
 # spanwise thickness of rib
 RIB_THICKNESS = "1.5 mm"
 # inset of rib from surface
@@ -70,11 +70,11 @@ def relative_location(from_loc, to_loc, frac):
     return loc
 
 
-def create_rib_vertical_post(component,comp_occurrence, rib_body, rib_post_loc, rib_post_width):
+def create_rib_vertical_post(component, comp_occurrence, rib_body, rib_post_loc, rib_post_width):
     """
     create a vertical rib post
     """
-    #log('creating rib post of width', rib_post_width, ' at ', rib_post_loc)
+    # log('creating rib post of width', rib_post_width, ' at ', rib_post_loc)
     # create 2 planes, rib_post_width apart, centered on rib_post_loc
 
     p1loc = rib_post_loc - (rib_post_width / 2)
@@ -113,7 +113,7 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
 
     for i, rib_post_loc in enumerate(rib_post_locs):
         post = create_rib_vertical_post(component, comp_occurrence, rib_body, rib_post_loc, rib_post_width)
-        post.name = 'rib_post_{}'.format(i+1)
+        post.name = '{}_post_{}'.format(rib_name, i + 1)
 
     # find the faces aligned with the construction planes
     plane1_face = find_coplanar_face(rib_body, plane1)
@@ -170,6 +170,12 @@ def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from
     return rib_body, plane1, plane2
 
 
+def cell_between_planes(cells, plane1, plane2):
+
+    log('cell between planes: plane1', plane1)
+    return cells[0]
+
+
 def boundary_fill_between_planes(component, comp_occurrence, body, plane1, plane2):
     boundary_fills = component.features.boundaryFillFeatures
     tools = ObjectCollection.create()
@@ -183,9 +189,14 @@ def boundary_fill_between_planes(component, comp_occurrence, body, plane1, plane
         boundary_fill_input.creationOccurrence = comp_occurrence
 
         # Specify which cell is kept
-        assert boundary_fill_input.bRepCells.count == 3, "expected 3 cells"
-
-        cell = cell_in_the_middle(boundary_fill_input.bRepCells)
+        cells = boundary_fill_input.bRepCells
+        cell_count = cells.count
+        if cell_count == 3:
+            cell = cell_in_the_middle(cells)
+        elif cell_count == 2:
+            cell = cell_between_planes(cells, plane1, plane2)
+        else:
+            raise Exception("Expected exactly 2 or 3 cells for boundary fill!")
         cell.isSelected = True
 
         # Create the boundary fill, based on the input data object
@@ -309,6 +320,8 @@ def index_of_point_in_middle(points):
         if dots[i] < 0:
             return i
 
+
 if __name__ == '__main__':
     import doctest
+
     doctest.testmod()
