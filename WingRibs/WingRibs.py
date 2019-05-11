@@ -20,7 +20,8 @@ RIB_THICKNESS = "1.5 mm"
 # inset of rib from surface
 RIB_INSET = "0.8 mm"
 # chordwise positions of rib verticals in cm (at root position. locations proportional elsewhere)
-RIB_VERTICAL_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
+# RIB_VERTICAL_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
+RIB_VERTICAL_ROOT_LOCS_CM = []
 RIB_POST_WIDTH_CM = 0.1
 
 LOGFILE = '/Users/andy/logs/create-ribs.log'
@@ -170,12 +171,6 @@ def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from
     return rib_body, plane1, plane2
 
 
-def cell_between_planes(cells, plane1, plane2):
-
-    log('cell between planes: plane1', plane1)
-    return cells[0]
-
-
 def boundary_fill_between_planes(component, comp_occurrence, body, plane1, plane2):
     boundary_fills = component.features.boundaryFillFeatures
     tools = ObjectCollection.create()
@@ -192,7 +187,8 @@ def boundary_fill_between_planes(component, comp_occurrence, body, plane1, plane
         cells = boundary_fill_input.bRepCells
         cell_count = cells.count
         if cell_count == 3:
-            cell = cell_in_the_middle(cells)
+            cell = cell_between_planes(cells, plane1, plane2)
+            ## cell_in_the_middle(cells)
         elif cell_count == 2:
             cell = cell_between_planes(cells, plane1, plane2)
         else:
@@ -264,6 +260,51 @@ def run(context):
         log(msg)
         if ui:
             ui.messageBox(msg)
+
+
+def normal_coord(point, normal):
+    """
+    returns the coordinate of the plane in it's normal direction
+    """
+    point = point.asArray()
+    normal = normal.asArray()
+
+    assert normal[0] + normal[1] + normal[2] == 1.0, "expected plane aligned with axes"
+
+    result = 0
+    for i in range(3):
+        result += normal[i] * point[i]
+    return result
+
+
+def is_point_between_planes(point, plane1, plane2):
+    assert plane1.geometry.normal.isEqualTo(plane2.geometry.normal), "plane normals expected the same"
+    normal = plane1.geometry.normal
+    log('point', point)
+
+    plane1_coord = normal_coord(plane1.geometry.origin, normal)
+    point_coord = normal_coord(point, normal)
+    plane2_coord = normal_coord(plane2.geometry.origin, normal)
+    log('coord: p1,point, p2', plane1_coord, point_coord, plane2_coord)
+
+    between = min(plane1_coord, plane2_coord) <= point_coord <= max(plane1_coord, plane2_coord)
+    log('between:', between)
+    return between
+
+
+def cell_between_planes(cells, plane1, plane2):
+    # find centroids of bounding boxes
+    bounding_boxes = [c.cellBody.boundingBox for c in cells]
+    centroids = [centroid_of_bounding_box(bb) for bb in bounding_boxes]
+
+    # see which centroids are between the construction planes
+    in_betweens = [is_point_between_planes(centroid.asPoint(), plane1, plane2) for centroid in centroids]
+    log('in betweens:', in_betweens)
+    assert len([b for b in in_betweens if b is True]) == 1
+
+    for i in range(len(in_betweens)):
+        if in_betweens[i] is True:
+            return cells[i]
 
 
 def cell_in_the_middle(cells):
