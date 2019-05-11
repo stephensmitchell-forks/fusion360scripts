@@ -14,14 +14,14 @@ TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
 # rib locations in cm spanwise from root.
-RIB_STATIONS = [15]
+RIB_STATIONS = [5,20]
 # spanwise thickness of rib
-RIB_THICKNESS = "1 mm"
+RIB_THICKNESS = "1.5 mm"
 # inset of rib from surface
-RIB_INSET = "1.2 mm"
+RIB_INSET = "0.8 mm"
 # chordwise positions of rib verticals in cm (at root position. locations proportional elsewhere)
 RIB_VERTICAL_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
-RIB_POST_WIDTH_CM = 0.15
+RIB_POST_WIDTH_CM = 0.1
 
 LOGFILE = '/Users/andy/logs/create-ribs.log'
 
@@ -74,7 +74,7 @@ def create_rib_vertical_post(component,comp_occurrence, rib_body, rib_post_loc, 
     """
     create a vertical rib post
     """
-    log('creating rib of width', rib_post_width, ' at ', rib_post_loc)
+    #log('creating rib post of width', rib_post_width, ' at ', rib_post_loc)
     # create 2 planes, rib_post_width apart, centered on rib_post_loc
 
     p1loc = rib_post_loc - (rib_post_width / 2)
@@ -90,6 +90,10 @@ def create_rib_vertical_post(component,comp_occurrence, rib_body, rib_post_loc, 
     plane2 = planes.add(plane2_input)
 
     post = boundary_fill_between_planes(component, comp_occurrence, rib_body, plane1, plane2)
+
+    # hide the construction planes
+    plane1.isLightBulbOn = False
+    plane2.isLightBulbOn = False
     return post
 
 
@@ -158,6 +162,11 @@ def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from
     plane2 = planes.add(plane2_input)
 
     rib_body = boundary_fill_between_planes(component, comp_occurrence, wing_body, plane1, plane2)
+
+    # hide the construction planes
+    plane1.isLightBulbOn = False
+    plane2.isLightBulbOn = False
+
     return rib_body, plane1, plane2
 
 
