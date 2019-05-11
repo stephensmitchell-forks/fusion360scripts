@@ -14,17 +14,20 @@ TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
 # rib locations in cm spanwise from root.
-RIB_STATIONS = [0, 20,30,40-1.5]
+RIB_STATIONS_CM = [1]
 # spanwise thickness of rib
 RIB_THICKNESS = "1.5 mm"
 # inset of rib from surface
 RIB_INSET = "0.8 mm"
 # chordwise positions of rib verticals in cm (at root position. locations proportional elsewhere)
-RIB_VERTICAL_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
-#RIB_VERTICAL_ROOT_LOCS_CM = []
+# RIB_VERTICAL_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
+RIB_VERTICAL_ROOT_LOCS_CM = [7.5]
 RIB_POST_WIDTH_CM = 0.1
+TRIANGLE_LEN_CM = 0.3
 
 LOGFILE = '/Users/andy/logs/create-ribs.log'
+
+VERT_DIRECTION = Vector3D.create(0., 0., 1.0)
 
 
 def convert(x):
@@ -41,16 +44,16 @@ def log(*msgs):
         f.write(line)
 
 
-def plane(comp):
-    return comp.xZConstructionPlane
-
-
 def vert_spanwise_plane(comp):
     return comp.yZConstructionPlane
 
 
 def chordwise_coord(point):
     return point.x
+
+
+def point(chordwise, spanwise, vertical):
+    return Point3D.create(chordwise, spanwise, vertical)
 
 
 def relative_location(from_loc, to_loc, frac):
@@ -95,6 +98,28 @@ def create_rib_vertical_post(component, comp_occurrence, rib_body, rib_post_loc,
     # hide the construction planes
     plane1.isLightBulbOn = False
     plane2.isLightBulbOn = False
+
+    # get dimensions of post
+    bounding_box = post.boundingBox
+    top = project_coord(bounding_box.maxPoint, VERT_DIRECTION)
+    bottom = project_coord(bounding_box.minPoint, VERT_DIRECTION)
+
+    log('top:', top, 'bottom:', bottom)
+
+    sketch = component.sketches.add(plane1)
+    lines = sketch.sketchCurves.sketchLines
+
+    lines.addByTwoPoints(
+        point(chordwise=0, spanwise=0, vertical=top),
+        point(chordwise=0, spanwise=TRIANGLE_LEN_CM, vertical=top)
+    )
+
+    lines.addByTwoPoints(
+        point(chordwise=0, spanwise=0, vertical=top),
+        point(chordwise=0, spanwise=-TRIANGLE_LEN_CM, vertical=top)
+    )
+
+
     return post
 
 
@@ -186,7 +211,7 @@ def boundary_fill_between_planes(component, comp_occurrence, body, plane1, plane
         # Specify which cell is kept
         cells = boundary_fill_input.bRepCells
         cell_count = cells.count
-        if cell_count in [2,3] :
+        if cell_count in [2, 3]:
             cell = cell_between_planes(cells, plane1, plane2)
         else:
             raise Exception("Expected exactly 2 or 3 cells for boundary fill. Got {}!".format(cell_count))
@@ -247,9 +272,9 @@ def run(context):
         ribs.name = 'ribs'
 
         # now create the ribs
-        for rib_id, rs in enumerate(RIB_STATIONS):
+        for rib_id, rs in enumerate(RIB_STATIONS_CM):
             rib_name = "rib_{}".format(rib_id + 1)
-            create_rib(wing_body, rootSketch, ribs, ribsOcc, '{} mm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name,
+            create_rib(wing_body, rootSketch, ribs, ribsOcc, '{} cm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name,
                        rib_vertical_fracs, RIB_POST_WIDTH_CM)
 
     except:
@@ -259,18 +284,18 @@ def run(context):
             ui.messageBox(msg)
 
 
-def normal_coord(point, normal):
+def project_coord(point, direction):
     """
     returns the coordinate of the plane in it's normal direction
     """
     point = point.asArray()
-    normal = normal.asArray()
+    direction = direction.asArray()
 
-    assert normal[0] + normal[1] + normal[2] == 1.0, "expected plane aligned with axes"
+    assert direction[0] + direction[1] + direction[2] == 1.0, "expected plane aligned with axes"
 
     result = 0
     for i in range(3):
-        result += normal[i] * point[i]
+        result += direction[i] * point[i]
     return result
 
 
@@ -279,9 +304,9 @@ def is_point_between_planes(point, plane1, plane2):
     normal = plane1.geometry.normal
     log('point', point)
 
-    plane1_coord = normal_coord(plane1.geometry.origin, normal)
-    point_coord = normal_coord(point, normal)
-    plane2_coord = normal_coord(plane2.geometry.origin, normal)
+    plane1_coord = project_coord(plane1.geometry.origin, normal)
+    point_coord = project_coord(point, normal)
+    plane2_coord = project_coord(plane2.geometry.origin, normal)
     log('coord: p1,point, p2', plane1_coord, point_coord, plane2_coord)
 
     between = min(plane1_coord, plane2_coord) <= point_coord <= max(plane1_coord, plane2_coord)
