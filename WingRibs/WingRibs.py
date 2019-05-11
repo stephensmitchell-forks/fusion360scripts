@@ -14,14 +14,14 @@ TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
 # rib locations in cm spanwise from root.
-RIB_STATIONS = [0, 20]
+RIB_STATIONS = [0, 20,30,40-1.5]
 # spanwise thickness of rib
 RIB_THICKNESS = "1.5 mm"
 # inset of rib from surface
 RIB_INSET = "0.8 mm"
 # chordwise positions of rib verticals in cm (at root position. locations proportional elsewhere)
-# RIB_VERTICAL_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
-RIB_VERTICAL_ROOT_LOCS_CM = []
+RIB_VERTICAL_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
+#RIB_VERTICAL_ROOT_LOCS_CM = []
 RIB_POST_WIDTH_CM = 0.1
 
 LOGFILE = '/Users/andy/logs/create-ribs.log'
@@ -186,13 +186,10 @@ def boundary_fill_between_planes(component, comp_occurrence, body, plane1, plane
         # Specify which cell is kept
         cells = boundary_fill_input.bRepCells
         cell_count = cells.count
-        if cell_count == 3:
-            cell = cell_between_planes(cells, plane1, plane2)
-            ## cell_in_the_middle(cells)
-        elif cell_count == 2:
+        if cell_count in [2,3] :
             cell = cell_between_planes(cells, plane1, plane2)
         else:
-            raise Exception("Expected exactly 2 or 3 cells for boundary fill!")
+            raise Exception("Expected exactly 2 or 3 cells for boundary fill. Got {}!".format(cell_count))
         cell.isSelected = True
 
         # Create the boundary fill, based on the input data object
