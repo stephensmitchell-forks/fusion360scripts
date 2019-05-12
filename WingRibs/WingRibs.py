@@ -28,6 +28,7 @@ TRIANGLE_LEN_CM = 0.3
 LOGFILE = '/Users/andy/logs/create-ribs.log'
 
 VERT_DIRECTION = Vector3D.create(0., 0., 1.0)
+SPANWISE_DIRECTION = Vector3D.create(0., 1., 0.)
 
 
 def convert(x):
@@ -103,21 +104,26 @@ def create_rib_vertical_post(component, comp_occurrence, rib_body, rib_post_loc,
     bounding_box = post.boundingBox
     top = project_coord(bounding_box.maxPoint, VERT_DIRECTION)
     bottom = project_coord(bounding_box.minPoint, VERT_DIRECTION)
+    spanwise_mid = project_coord(centroid_of_bounding_box(bounding_box), SPANWISE_DIRECTION)
 
     log('top:', top, 'bottom:', bottom)
+    assert plane1.isValid
 
-    sketch = component.sketches.add(plane1)
+    sketch = component.sketches.add(plane2, comp_occurrence)
     lines = sketch.sketchCurves.sketchLines
 
-    lines.addByTwoPoints(
-        point(chordwise=0, spanwise=0, vertical=top),
-        point(chordwise=0, spanwise=TRIANGLE_LEN_CM, vertical=top)
-    )
 
-    lines.addByTwoPoints(
-        point(chordwise=0, spanwise=0, vertical=top),
-        point(chordwise=0, spanwise=-TRIANGLE_LEN_CM, vertical=top)
-    )
+    p1 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid, vertical=top-2*TRIANGLE_LEN_CM))
+    p2 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid+TRIANGLE_LEN_CM, vertical=top+2*TRIANGLE_LEN_CM))
+    p3 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid-TRIANGLE_LEN_CM, vertical=top+2*TRIANGLE_LEN_CM))
+
+    log('p1', p1)
+    log('p2', p2)
+    log('p3', p3)
+
+    lines.addByTwoPoints(p1,p2)
+    lines.addByTwoPoints(p2,p3)
+    lines.addByTwoPoints(p3,p1)
 
 
     return post
@@ -163,6 +169,9 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
 
 
 def find_coplanar_face(body, plane):
+    """
+    returns the face of the body which is coplanar with the given plane
+    """
     for face in body.faces:
         if face.geometry.surfaceType == SurfaceTypes.PlaneSurfaceType:
             face_plane = Plane.cast(face.geometry)
