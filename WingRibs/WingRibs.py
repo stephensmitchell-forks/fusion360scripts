@@ -14,14 +14,15 @@ TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
 # rib locations in cm spanwise from root.
-RIB_STATIONS_CM = [1]
+RIB_STATIONS_CM = [0,2]
 # spanwise thickness of rib
 RIB_THICKNESS = "1.5 mm"
 # inset of rib from surface
 RIB_INSET = "0.8 mm"
-# chordwise positions of rib verticals in cm (at root position. locations proportional elsewhere)
-# RIB_VERTICAL_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
-RIB_VERTICAL_ROOT_LOCS_CM = [7.5]
+# chordwise positions of rib verticals posts in cm (at root position. locations proportional elsewhere)
+# RIB_POST_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
+RIB_POST_ROOT_LOCS_CM = [7.5]
+# chordwise width of rib posts
 RIB_POST_WIDTH_CM = 0.1
 TRIANGLE_LEN_CM = 0.3
 
@@ -112,19 +113,30 @@ def create_rib_vertical_post(component, comp_occurrence, rib_body, rib_post_loc,
     sketch = component.sketches.add(plane2, comp_occurrence)
     lines = sketch.sketchCurves.sketchLines
 
+    p1 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid, vertical=top - TRIANGLE_LEN_CM))
+    p2 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid + TRIANGLE_LEN_CM, vertical=top))
+    p3 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid - TRIANGLE_LEN_CM, vertical=top))
 
-    p1 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid, vertical=top-2*TRIANGLE_LEN_CM))
-    p2 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid+TRIANGLE_LEN_CM, vertical=top+2*TRIANGLE_LEN_CM))
-    p3 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid-TRIANGLE_LEN_CM, vertical=top+2*TRIANGLE_LEN_CM))
+    lines.addByTwoPoints(p1, p2)
+    lines.addByTwoPoints(p2, p3)
+    lines.addByTwoPoints(p3, p1)
 
-    log('p1', p1)
-    log('p2', p2)
-    log('p3', p3)
+    p1 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid, vertical=bottom + TRIANGLE_LEN_CM))
+    p2 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid + TRIANGLE_LEN_CM, vertical=bottom))
+    p3 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid - TRIANGLE_LEN_CM, vertical=bottom))
 
-    lines.addByTwoPoints(p1,p2)
-    lines.addByTwoPoints(p2,p3)
-    lines.addByTwoPoints(p3,p1)
+    lines.addByTwoPoints(p1, p2)
+    lines.addByTwoPoints(p2, p3)
+    lines.addByTwoPoints(p3, p1)
 
+    assert sketch.profiles.count ==2, "expected 2 profiles in the sketch"
+    profile = sketch.profiles.item(0)
+    extrudes = component.features.extrudeFeatures
+    extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width), FeatureOperations.NewBodyFeatureOperation)
+
+    profile = sketch.profiles.item(1)
+    extrudes = component.features.extrudeFeatures
+    extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width), FeatureOperations.NewBodyFeatureOperation)
 
     return post
 
@@ -252,12 +264,12 @@ def run(context):
         root = Component.cast(des.rootComponent)
 
         # locate the root and tip sketches
-        rootSketch = root.sketches.itemByName(ROOT_SKETCH)
-        if rootSketch is None:
+        root_sketch = root.sketches.itemByName(ROOT_SKETCH)
+        if root_sketch is None:
             raise ValueError('Root sketch "{}" not found'.format(ROOT_SKETCH))
 
-        tipSketch = root.sketches.itemByName(TIP_SKETCH)
-        if tipSketch is None:
+        tip_sketch = root.sketches.itemByName(TIP_SKETCH)
+        if tip_sketch is None:
             raise ValueError('Tip sketch "{}" not found'.format(TIP_SKETCH))
 
         # locate the wing body
@@ -271,8 +283,8 @@ def run(context):
         chord_length = end_coord - start_coord
         log('start, end, chord length', start_coord, end_coord, chord_length)
 
-        rib_vertical_fracs = [r / chord_length for r in RIB_VERTICAL_ROOT_LOCS_CM]
-        log('rib vertical positions (mm)', RIB_VERTICAL_ROOT_LOCS_CM)
+        rib_vertical_fracs = [r / chord_length for r in RIB_POST_ROOT_LOCS_CM]
+        log('rib vertical positions (mm)', RIB_POST_ROOT_LOCS_CM)
         log('rib vertical relative positions', rib_vertical_fracs)
 
         # create new component = 'ribs'
@@ -283,7 +295,7 @@ def run(context):
         # now create the ribs
         for rib_id, rs in enumerate(RIB_STATIONS_CM):
             rib_name = "rib_{}".format(rib_id + 1)
-            create_rib(wing_body, rootSketch, ribs, ribsOcc, '{} cm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name,
+            create_rib(wing_body, root_sketch, ribs, ribsOcc, '{} cm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name,
                        rib_vertical_fracs, RIB_POST_WIDTH_CM)
 
     except:
@@ -331,22 +343,22 @@ def cell_between_planes(cells, plane1, plane2):
     # see which centroids are between the construction planes
     in_betweens = [is_point_between_planes(centroid.asPoint(), plane1, plane2) for centroid in centroids]
     log('in betweens:', in_betweens)
-    assert len([b for b in in_betweens if b is True]) == 1
+    assert len([b for b in in_betweens if b is True]) == 1, "Expected 1 cell in between planes. Are you sure that the wing body is not shelled?"
 
     for i in range(len(in_betweens)):
         if in_betweens[i] is True:
             return cells[i]
 
 
-def cell_in_the_middle(cells):
-    """ from a list of 3 cells, return the one in the middle.
-    """
-    assert len(cells) == 3, "expected 3 cells - ensure the main body is solid and not shelled"
-    # find centroids of bounding boxes
-    bounding_boxes = [c.cellBody.boundingBox for c in cells]
-    centroids = [centroid_of_bounding_box(bb) for bb in bounding_boxes]
-    idx = index_of_point_in_middle(centroids)
-    return cells[idx]
+# def cell_in_the_middle(cells):
+#     """ from a list of 3 cells, return the one in the middle.
+#     """
+#     assert len(cells) == 3, "expected 3 cells - ensure the main body is solid and not shelled"
+#     # find centroids of bounding boxes
+#     bounding_boxes = [c.cellBody.boundingBox for c in cells]
+#     centroids = [centroid_of_bounding_box(bb) for bb in bounding_boxes]
+#     idx = index_of_point_in_middle(centroids)
+#     return cells[idx]
 
 
 def centroid_of_bounding_box(bb):
@@ -360,38 +372,38 @@ def centroid_of_bounding_box(bb):
     return centre_vec
 
 
-def index_of_point_in_middle(points):
-    """ determine which point is in the middle of 3 approximately colinear points in space.
-        This is done by taking each point in turn, and looking at the directions of the vectors
-        to the other 2 points. The point in the middle should have these vectors in approx 
-        opposite directions. This can be checked by looking at the sign of the dot product
-        between the vectors.
-    """
-    assert len(points) == 3, "expected3 points"
-    dots = []
-    for i in range(3):
-        a = points[i]
-        b = points[(i + 1) % 3]
-        c = points[(i + 2) % 3]
-        ab = b.copy()
-        ab.subtract(a)
-        ab.normalize()
-        ac = c.copy()
-        ac.subtract(a)
-        ac.normalize()
-        dot = ab.dotProduct(ac)
-        dots.append(dot)
-
-    # log("dots: {}".format(dots))
-
-    negative_dots = [d for d in dots if d < 0]
-    assert len(negative_dots) == 1, "expected exactly 1 negative dot product."
-
-    # return index of the negative dot product
-    for i in range(len(dots)):
-        if dots[i] < 0:
-            return i
-
+# def index_of_point_in_middle(points):
+#     """ determine which point is in the middle of 3 approximately colinear points in space.
+#         This is done by taking each point in turn, and looking at the directions of the vectors
+#         to the other 2 points. The point in the middle should have these vectors in approx
+#         opposite directions. This can be checked by looking at the sign of the dot product
+#         between the vectors.
+#     """
+#     assert len(points) == 3, "expected3 points"
+#     dots = []
+#     for i in range(3):
+#         a = points[i]
+#         b = points[(i + 1) % 3]
+#         c = points[(i + 2) % 3]
+#         ab = b.copy()
+#         ab.subtract(a)
+#         ab.normalize()
+#         ac = c.copy()
+#         ac.subtract(a)
+#         ac.normalize()
+#         dot = ab.dotProduct(ac)
+#         dots.append(dot)
+#
+#     # log("dots: {}".format(dots))
+#
+#     negative_dots = [d for d in dots if d < 0]
+#     assert len(negative_dots) == 1, "expected exactly 1 negative dot product."
+#
+#     # return index of the negative dot product
+#     for i in range(len(dots)):
+#         if dots[i] < 0:
+#             return i
+#
 
 if __name__ == '__main__':
     import doctest
