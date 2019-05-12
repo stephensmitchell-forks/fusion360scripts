@@ -76,7 +76,7 @@ def relative_location(from_loc, to_loc, frac):
     return loc
 
 
-def create_rib_vertical_post(component, comp_occurrence, rib_body, rib_post_loc, rib_post_width):
+def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, rib_post_loc, rib_post_width):
     """
     create a vertical rib post
     """
@@ -129,14 +129,37 @@ def create_rib_vertical_post(component, comp_occurrence, rib_body, rib_post_loc,
     lines.addByTwoPoints(p2, p3)
     lines.addByTwoPoints(p3, p1)
 
+    # extrude the 2 triangular profiles just created
     assert sketch.profiles.count ==2, "expected 2 profiles in the sketch"
     profile = sketch.profiles.item(0)
     extrudes = component.features.extrudeFeatures
-    extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width), FeatureOperations.NewBodyFeatureOperation)
+    top_triangle_extrusion = extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width), FeatureOperations.NewBodyFeatureOperation)
+    top_triangle = top_triangle_extrusion.bodies.item(0)
+    top_triangle.name = 'top_triangle'
 
     profile = sketch.profiles.item(1)
     extrudes = component.features.extrudeFeatures
-    extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width), FeatureOperations.NewBodyFeatureOperation)
+    bottom_triangle_extrusion = extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width), FeatureOperations.NewBodyFeatureOperation)
+    bottom_triangle = bottom_triangle_extrusion.bodies.item(0)
+    bottom_triangle.name = 'bottom_triangle'
+
+    # now trim the triangles to the intersection with the wing body
+    tool_bodies = ObjectCollection.create()
+    tool_bodies.add(wing_body)
+    combines = component.features.combineFeatures
+
+    combine_input = combines.createInput(top_triangle, tool_bodies)
+    combine_input.isKeepToolBodies = True
+    combine_input.isNewComponent = False
+    combine_input.operation = FeatureOperations.IntersectFeatureOperation
+    combines.add(combine_input)
+
+    combine_input = combines.createInput(bottom_triangle, tool_bodies)
+    combine_input.isKeepToolBodies = True
+    combine_input.isNewComponent = False
+    combine_input.operation = FeatureOperations.IntersectFeatureOperation
+    combines.add(combine_input)
+
 
     return post
 
@@ -156,7 +179,7 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
     rib_post_locs = [relative_location(start_coord, end_coord, frac) for frac in rib_post_relative_positions]
 
     for i, rib_post_loc in enumerate(rib_post_locs):
-        post = create_rib_vertical_post(component, comp_occurrence, rib_body, rib_post_loc, rib_post_width)
+        post = create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, rib_post_loc, rib_post_width)
         post.name = '{}_post_{}'.format(rib_name, i + 1)
 
     # find the faces aligned with the construction planes
