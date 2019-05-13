@@ -14,17 +14,16 @@ TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
 # rib locations in cm spanwise from root.
-RIB_STATIONS_CM = [0,2]
+RIB_STATIONS_CM = [0,2,4-0.12]
 # spanwise thickness of rib
-RIB_THICKNESS = "1.5 mm"
+RIB_THICKNESS = "1.2 mm"
 # inset of rib from surface
 RIB_INSET = "0.8 mm"
 # chordwise positions of rib verticals posts in cm (at root position. locations proportional elsewhere)
-# RIB_POST_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
-RIB_POST_ROOT_LOCS_CM = [7.5]
+RIB_POST_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
 # chordwise width of rib posts
 RIB_POST_WIDTH_CM = 0.1
-TRIANGLE_LEN_CM = 0.3
+TRIANGLE_LEN_CM = 0.5
 
 LOGFILE = '/Users/andy/logs/create-ribs.log'
 
