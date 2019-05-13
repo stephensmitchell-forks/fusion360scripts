@@ -1,0 +1,10 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"script",
+	"author":	"",
+	"description":	{
+		"":	"Creates 3d labprint-like spars"
+	},
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}
