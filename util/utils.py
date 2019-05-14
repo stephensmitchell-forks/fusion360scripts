@@ -1,4 +1,7 @@
-from adsk.core import Vector3D, Point3D, SurfaceTypes, Plane
+import math
+
+from adsk.core import Vector3D, Point3D, SurfaceTypes, Plane, ObjectCollection
+from adsk.fusion import FeatureOperations
 
 
 def to_string(x):
@@ -18,7 +21,6 @@ def log_func(file, *msgs):
         f.write(line)
 
 
-
 def centroid_of_bounding_box(bb):
     """ returns a Vector3D representing the centroid of the bounding box """
     min_point = bb.minPoint
@@ -34,9 +36,9 @@ def is_point_between_planes(point, plane1, plane2):
     assert plane1.geometry.normal.isEqualTo(plane2.geometry.normal), "plane normals expected the same"
     normal = plane1.geometry.normal
 
-    plane1_coord = project_coord(plane1.geometry.origin, normal)
-    point_coord = project_coord(point, normal)
-    plane2_coord = project_coord(plane2.geometry.origin, normal)
+    plane1_coord = project_coord(plane1.geometry.origin.asArray(), normal.asArray())
+    point_coord = project_coord(point.asArray(), normal.asArray())
+    plane2_coord = project_coord(plane2.geometry.origin.asArray(), normal.asArray())
     between = min(plane1_coord, plane2_coord) <= point_coord <= max(plane1_coord, plane2_coord)
     return between
 
@@ -48,7 +50,8 @@ def cell_between_planes(cells, plane1, plane2):
 
     # see which centroids are between the construction planes
     in_betweens = [is_point_between_planes(centroid.asPoint(), plane1, plane2) for centroid in centroids]
-    assert len([b for b in in_betweens if b is True]) == 1, "Expected 1 cell in between planes. Are you sure that the wing body is not shelled?"
+    assert len([b for b in in_betweens if b is True]) == 1, \
+        "Expected 1 cell in between planes. Are you sure that the wing body is not shelled?"
 
     for i in range(len(in_betweens)):
         if in_betweens[i] is True:
@@ -68,20 +71,64 @@ def find_coplanar_face(body, plane):
 
 def project_coord(point, direction):
     """
-    returns the coordinate of the plane in it's normal direction
+    returns the projection of a point in a direction
+
+    >>> project_coord([1,2,3], [0,1,0])
+    2.0
+
+    >>> project_coord([1,2,3], [1,0,0])
+    1.0
+
+    >>> project_coord([1,2,3], [0,0,1])
+    3.0
+
+    >>> project_coord([1,2,3], [0,0,2])
+    3.0
+
     """
-    point = point.asArray()
-    direction = direction.asArray()
+    a, b, c = point
+    x, y, z = direction
 
-    assert direction[0] + direction[1] + direction[2] == 1.0, "expected plane aligned with axes"
+    return a * x + b * y + c * z / math.sqrt(x * x + y * y + z * z)
 
-    result = 0
-    for i in range(3):
-        result += direction[i] * point[i]
-    return result
 
+def boundary_fill_between_planes(component, comp_occurrence, body, plane1, plane2):
+    boundary_fills = component.features.boundaryFillFeatures
+    tools = ObjectCollection.create()
+    tools.add(body)
+    tools.add(plane1)
+    tools.add(plane2)
+
+    boundary_fill_input = boundary_fills.createInput(tools, FeatureOperations.NewBodyFeatureOperation)
+    try:
+        # Boundary fill will be created in sub component
+        boundary_fill_input.creationOccurrence = comp_occurrence
+
+        # Specify which cell is kept
+        cells = boundary_fill_input.bRepCells
+        cell_count = cells.count
+        if cell_count in [2, 3]:
+            cell = cell_between_planes(cells, plane1, plane2)
+        else:
+            raise Exception("Expected exactly 2 or 3 cells for boundary fill. Got {}!".format(cell_count))
+        cell.isSelected = True
+
+        # Create the boundary fill, based on the input data object
+        boundary_fill_feature = boundary_fills.add(boundary_fill_input)
+        assert 1 == boundary_fill_feature.bodies.count, 'expected a single rib body to be created'
+        rib_body = boundary_fill_feature.bodies.item(0)
+        return rib_body
+    except:
+        # rollback the boundary fill transaction
+        try:
+            boundary_fill_input.cancel()
+        except Exception as ignored:
+            pass
+
+        raise
 
 
 if __name__ == '__main__':
     import doctest
+
     doctest.testmod()

@@ -8,6 +8,7 @@ from functools import partial
 
 from adsk.core import Application, Matrix3D, ValueInput
 from adsk.fusion import Design, Component
+from .utils import boundary_fill_between_planes
 from .utils import log_func
 
 """
@@ -32,7 +33,7 @@ def horizontal_plane(component):
     return component.xYConstructionPlane
 
 
-def create_spar_from_line(component, component_occurrence, sketch, line, spar_width):
+def create_spar_from_line(component, component_occurrence, wing_body, sketch, line, spar_width):
     log(line)
     start_point = sketch.sketchToModelSpace(line.startSketchPoint.geometry)
     end_point = sketch.sketchToModelSpace(line.endSketchPoint.geometry)
@@ -48,16 +49,21 @@ def create_spar_from_line(component, component_occurrence, sketch, line, spar_wi
 
     # create offset planes one either side of the center plane
     plane_input = planes.createInput()
-    offset = ValueInput.createByReal(spar_width)
+    offset = ValueInput.createByReal(spar_width/2)
     plane_input.setByOffset(center_plane, offset)
     plane1 = planes.add(plane_input)
 
     plane_input = planes.createInput()
-    offset = ValueInput.createByReal(-1 * spar_width)
+    offset = ValueInput.createByReal(-1 * spar_width/2)
     plane_input.setByOffset(center_plane, offset)
     plane2 = planes.add(plane_input)
 
-    # now use boundary fill to create spar between construction planes and wing body/
+    for p in [center_plane, plane1, plane2]:
+        p.isLightBulbOn = False
+
+    # now use boundary fill to create spar between construction planes and wing body
+    spar = boundary_fill_between_planes(component, component_occurrence, wing_body, plane1, plane2)
+    return spar
 
 
 def run(context):
@@ -89,15 +95,13 @@ def run(context):
         component = Component.cast(component_occurrence.component)
         component.name = CREATE_COMPONENT_NAME
 
-        log('created component')
-
         # now create the spars, one for each line on the sketch.
-
         lines = sketch.sketchCurves.sketchLines
         log('num lines:', lines.count)
-        for line in lines:
-            create_spar_from_line(component, component_occurrence, sketch, line, SPAR_THICKNESS_CM)
-
+        for i, line in enumerate(lines):
+            spar = create_spar_from_line(component, component_occurrence, wing_body, sketch, line, SPAR_THICKNESS_CM)
+            spar.name = "spar_{}".format(i+1)
+            log('Created spar', spar.name)
 
         ui.messageBox('done')
 

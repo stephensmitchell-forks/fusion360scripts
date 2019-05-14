@@ -6,6 +6,7 @@ import traceback
 
 from adsk.core import Application, Matrix3D, Point3D, Vector3D, ValueInput, ObjectCollection, SurfaceTypes, Plane
 from adsk.fusion import Design, Component, FeatureOperations
+from .utils import boundary_fill_between_planes
 from .utils import log_func
 from .utils import project_coord, centroid_of_bounding_box, find_coplanar_face, cell_between_planes
 from functools import partial
@@ -94,9 +95,9 @@ def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, ri
 
     # get dimensions of post
     bounding_box = post.boundingBox
-    top = project_coord(bounding_box.maxPoint, VERT_DIRECTION)
-    bottom = project_coord(bounding_box.minPoint, VERT_DIRECTION)
-    spanwise_mid = project_coord(centroid_of_bounding_box(bounding_box), SPANWISE_DIRECTION)
+    top = project_coord(bounding_box.maxPoint.asArray(), VERT_DIRECTION.asArray())
+    bottom = project_coord(bounding_box.minPoint.asArray(), VERT_DIRECTION.asArray())
+    spanwise_mid = project_coord(centroid_of_bounding_box(bounding_box).asArray(), SPANWISE_DIRECTION.asArray())
 
     log('top:', top, 'bottom:', bottom)
     assert plane1.isValid
@@ -221,36 +222,6 @@ def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from
     return rib_body, plane1, plane2
 
 
-def boundary_fill_between_planes(component, comp_occurrence, body, plane1, plane2):
-    boundary_fills = component.features.boundaryFillFeatures
-    tools = ObjectCollection.create()
-    tools.add(body)
-    tools.add(plane1)
-    tools.add(plane2)
-
-    boundary_fill_input = boundary_fills.createInput(tools, FeatureOperations.NewBodyFeatureOperation)
-    try:
-        # Boundary fill will be created in sub component
-        boundary_fill_input.creationOccurrence = comp_occurrence
-
-        # Specify which cell is kept
-        cells = boundary_fill_input.bRepCells
-        cell_count = cells.count
-        if cell_count in [2, 3]:
-            cell = cell_between_planes(cells, plane1, plane2)
-        else:
-            raise Exception("Expected exactly 2 or 3 cells for boundary fill. Got {}!".format(cell_count))
-        cell.isSelected = True
-
-        # Create the boundary fill, based on the input data object
-        boundary_fill_feature = boundary_fills.add(boundary_fill_input)
-        assert 1 == boundary_fill_feature.bodies.count, 'expected a single rib body to be created'
-        rib_body = boundary_fill_feature.bodies.item(0)
-        return rib_body
-    except:
-        # rollback the boundary fill transaction
-        boundary_fill_input.cancel()
-        raise
 
 
 def run(context):
