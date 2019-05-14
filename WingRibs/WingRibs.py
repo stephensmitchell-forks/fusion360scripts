@@ -6,8 +6,9 @@ import traceback
 
 from adsk.core import Application, Matrix3D, Point3D, Vector3D, ValueInput, ObjectCollection, SurfaceTypes, Plane
 from adsk.fusion import Design, Component, FeatureOperations
-
-ui = None
+from .utils import log_func
+from .utils import project_coord, centroid_of_bounding_box, find_coplanar_face, cell_between_planes
+from functools import partial
 
 ROOT_SKETCH = 'root-profile'
 TIP_SKETCH = 'tip-profile'
@@ -28,23 +29,12 @@ RIB_POST_WIDTH_CM = 0.1
 TRIANGLE_LEN_CM = 0.5
 
 LOGFILE = '/Users/andy/logs/create-ribs.log'
+log = partial(log_func, LOGFILE)
 
 VERT_DIRECTION = Vector3D.create(0., 0., 1.0)
 SPANWISE_DIRECTION = Vector3D.create(0., 1., 0.)
 
-
-def convert(x):
-    if type(x) in (Vector3D, Point3D):
-        return "{:.3f},{:.3f},{:.3f}".format(x.x, x.y, x.z)
-    return str(x)
-
-
-def log(*msgs):
-    line = " ".join([convert(msg) for msg in msgs])
-    line = "{}\n".format(line)
-
-    with open(LOGFILE, 'a') as f:
-        f.write(line)
+ui = None
 
 
 def vert_spanwise_plane(comp):
@@ -204,16 +194,6 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
     shell_feats.add(shell_feature_input)
 
 
-def find_coplanar_face(body, plane):
-    """
-    returns the face of the body which is coplanar with the given plane
-    """
-    for face in body.faces:
-        if face.geometry.surfaceType == SurfaceTypes.PlaneSurfaceType:
-            face_plane = Plane.cast(face.geometry)
-            if face_plane.isCoPlanarTo(plane.geometry):
-                return face
-
 
 def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, thickness):
     """
@@ -330,49 +310,7 @@ def run(context):
             ui.messageBox(msg)
 
 
-def project_coord(point, direction):
-    """
-    returns the coordinate of the plane in it's normal direction
-    """
-    point = point.asArray()
-    direction = direction.asArray()
 
-    assert direction[0] + direction[1] + direction[2] == 1.0, "expected plane aligned with axes"
-
-    result = 0
-    for i in range(3):
-        result += direction[i] * point[i]
-    return result
-
-
-def is_point_between_planes(point, plane1, plane2):
-    assert plane1.geometry.normal.isEqualTo(plane2.geometry.normal), "plane normals expected the same"
-    normal = plane1.geometry.normal
-    log('point', point)
-
-    plane1_coord = project_coord(plane1.geometry.origin, normal)
-    point_coord = project_coord(point, normal)
-    plane2_coord = project_coord(plane2.geometry.origin, normal)
-    log('coord: p1,point, p2', plane1_coord, point_coord, plane2_coord)
-
-    between = min(plane1_coord, plane2_coord) <= point_coord <= max(plane1_coord, plane2_coord)
-    log('between:', between)
-    return between
-
-
-def cell_between_planes(cells, plane1, plane2):
-    # find centroids of bounding boxes
-    bounding_boxes = [c.cellBody.boundingBox for c in cells]
-    centroids = [centroid_of_bounding_box(bb) for bb in bounding_boxes]
-
-    # see which centroids are between the construction planes
-    in_betweens = [is_point_between_planes(centroid.asPoint(), plane1, plane2) for centroid in centroids]
-    log('in betweens:', in_betweens)
-    assert len([b for b in in_betweens if b is True]) == 1, "Expected 1 cell in between planes. Are you sure that the wing body is not shelled?"
-
-    for i in range(len(in_betweens)):
-        if in_betweens[i] is True:
-            return cells[i]
 
 
 # def cell_in_the_middle(cells):
@@ -386,15 +324,6 @@ def cell_between_planes(cells, plane1, plane2):
 #     return cells[idx]
 
 
-def centroid_of_bounding_box(bb):
-    """ returns a Vector3D representing the centroid of the bounding box """
-    min_point = bb.minPoint
-    max_point = bb.maxPoint
-    min_to_max = min_point.vectorTo(max_point)
-    min_to_max.scaleBy(0.5)
-    centre_vec = min_point.asVector()
-    centre_vec.add(min_to_max)
-    return centre_vec
 
 
 # def index_of_point_in_middle(points):

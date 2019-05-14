@@ -8,7 +8,7 @@ from functools import partial
 
 from adsk.core import Application, Matrix3D, ValueInput
 from adsk.fusion import Design, Component
-from .utils import log as log_func
+from .utils import log_func
 
 """
 Creates 3DLabprint-like spars on a wing solid.
@@ -22,7 +22,6 @@ WING_BODY = 'skin'
 SPARS_SKETCH = 'spars'
 CREATE_COMPONENT_NAME = 'spars'
 SPAR_THICKNESS_CM = 0.1
-
 
 
 LOGFILE = '/Users/andy/logs/create-spars.log'
