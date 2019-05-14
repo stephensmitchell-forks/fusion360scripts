@@ -13,6 +13,8 @@ ROOT_SKETCH = 'root-profile'
 TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
+CREATE_COMPONENT_NAME = 'ribs'
+
 # rib locations in cm spanwise from root.
 RIB_STATIONS_CM = [0,2,4-0.12]
 # spanwise thickness of rib
@@ -309,15 +311,16 @@ def run(context):
         log('rib vertical positions (mm)', RIB_POST_ROOT_LOCS_CM)
         log('rib vertical relative positions', rib_vertical_fracs)
 
-        # create new component = 'ribs'
-        ribsOcc = root.occurrences.addNewComponent(Matrix3D.create())
-        ribs = Component.cast(ribsOcc.component)
-        ribs.name = 'ribs'
+        # create new component
+        component_occurrence = root.occurrences.addNewComponent(Matrix3D.create())
+        component = Component.cast(component_occurrence.component)
+        component.name = CREATE_COMPONENT_NAME
 
         # now create the ribs
         for rib_id, rs in enumerate(RIB_STATIONS_CM):
             rib_name = "rib_{}".format(rib_id + 1)
-            create_rib(wing_body, root_sketch, ribs, ribsOcc, '{} cm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name,
+            create_rib(wing_body, root_sketch, component, component_occurrence,
+                       '{} cm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name,
                        rib_vertical_fracs, RIB_POST_WIDTH_CM)
 
     except:
