@@ -6,9 +6,10 @@ import datetime as dt
 import traceback
 from functools import partial
 
-from adsk.core import Application, Matrix3D, ValueInput
-from adsk.fusion import Design, Component
-from .utils import boundary_fill_between_planes
+from adsk.core import Application, Matrix3D, ValueInput, Point3D, ObjectCollection
+from adsk.fusion import Design, Component, FeatureOperations, ExtentDirections
+from .orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
+from .utils import boundary_fill_between_planes, project_coord
 from .utils import log_func
 
 """
@@ -23,7 +24,8 @@ WING_BODY = 'skin'
 SPARS_SKETCH = 'spars'
 CREATE_COMPONENT_NAME = 'spars'
 SPAR_THICKNESS_CM = 0.1
-
+CIRCLE_DIAMETER_CM = 0.5
+CIRCLE_SPACING_CM = 0.6
 
 LOGFILE = '/Users/andy/logs/create-spars.log'
 log = partial(log_func, LOGFILE)
@@ -33,10 +35,10 @@ def horizontal_plane(component):
     return component.xYConstructionPlane
 
 
-def create_spar_from_line(component, component_occurrence, wing_body, sketch, line, spar_width):
+def create_spar_from_line(component, component_occurrence, wing_body, spar_lines_sketch, line, spar_width):
     log(line)
-    start_point = sketch.sketchToModelSpace(line.startSketchPoint.geometry)
-    end_point = sketch.sketchToModelSpace(line.endSketchPoint.geometry)
+    start_point = spar_lines_sketch.sketchToModelSpace(line.startSketchPoint.geometry)
+    end_point = spar_lines_sketch.sketchToModelSpace(line.endSketchPoint.geometry)
     log(start_point, end_point)
 
     # create construction plane, centered on line, at 90 degrees to horizontal plan
@@ -49,12 +51,12 @@ def create_spar_from_line(component, component_occurrence, wing_body, sketch, li
 
     # create offset planes one either side of the center plane
     plane_input = planes.createInput()
-    offset = ValueInput.createByReal(spar_width/2)
+    offset = ValueInput.createByReal(spar_width / 2)
     plane_input.setByOffset(center_plane, offset)
     plane1 = planes.add(plane_input)
 
     plane_input = planes.createInput()
-    offset = ValueInput.createByReal(-1 * spar_width/2)
+    offset = ValueInput.createByReal(-1 * spar_width / 2)
     plane_input.setByOffset(center_plane, offset)
     plane2 = planes.add(plane_input)
 
@@ -63,6 +65,56 @@ def create_spar_from_line(component, component_occurrence, wing_body, sketch, li
 
     # now use boundary fill to create spar between construction planes and wing body
     spar = boundary_fill_between_planes(component, component_occurrence, wing_body, plane1, plane2)
+
+    # now get bounding box of spar and find min an max spanwise dimensions
+
+    min_point = spar.boundingBox.minPoint
+    max_point = spar.boundingBox.maxPoint
+    sw1 = project_coord(min_point.asArray(), SPANWISE_DIRECTION.asArray())
+    sw2 = project_coord(max_point.asArray(), SPANWISE_DIRECTION.asArray())
+    min_spanwise = min(sw1, sw2)
+    max_spanwise = max(sw1, sw2)
+
+    v1 = project_coord(min_point.asArray(), VERTICAL_UP_DIRECTION.asArray())
+    v2 = project_coord(max_point.asArray(), VERTICAL_UP_DIRECTION.asArray())
+
+    min_vertical = min(v1, v2)
+    max_vertical = max(v1, v2)
+    log("Spanwise range = {} to {}".format(min_spanwise, max_spanwise))
+    log("Vertical range = {} to {}".format(min_vertical, max_vertical))
+
+    # create sketch and draw circles in a row spanwise
+    spar_face_sketch = component.sketches.add(center_plane)
+    circle_locs = []
+    loc = min_spanwise + CIRCLE_SPACING_CM
+    while loc + CIRCLE_DIAMETER_CM / 2 < max_spanwise:
+        circle_locs.append(loc)
+        loc = loc + CIRCLE_SPACING_CM
+
+    log('Circle locs:', circle_locs)
+    vertical_center = 0
+
+    # sketch origin seems to be centered on the body. x seems to be spanwise
+    # TODO: formalise this, for different part orientations. Need a way to deduce sketch orientation
+    x_offset = (max_spanwise-min_spanwise)/2
+    # create circles
+    for loc in circle_locs:
+        spar_face_sketch.sketchCurves.sketchCircles.addByCenterRadius(Point3D.create(loc-x_offset, vertical_center, 0),
+                                                            CIRCLE_DIAMETER_CM / 2)
+
+    profiles = ObjectCollection.create()
+    for c in spar_face_sketch.profiles:
+        profiles.add(c)
+    # now extrude the circles to cut the spar
+    extrudes = component.features.extrudeFeatures
+    extrude_input = extrudes.createInput(profiles, FeatureOperations.CutFeatureOperation)
+    # extrude_input.setAllExtent(ExtentDirections.SymmetricExtentDirection)
+    distanceForCut = ValueInput.createByString('2 cm') # some distance > we need.
+    extrude_input.setSymmetricExtent(distanceForCut, True)
+    extrude_input.participantBodies = [spar]
+
+    extrudes.add(extrude_input)
+
     return spar
 
 
@@ -100,7 +152,7 @@ def run(context):
         log('num lines:', lines.count)
         for i, line in enumerate(lines):
             spar = create_spar_from_line(component, component_occurrence, wing_body, sketch, line, SPAR_THICKNESS_CM)
-            spar.name = "spar_{}".format(i+1)
+            spar.name = "spar_{}".format(i + 1)
             log('Created spar', spar.name)
 
         ui.messageBox('done')
@@ -114,5 +166,5 @@ def run(context):
 
 if __name__ == '__main__':
     import doctest
-    doctest.testmod()
 
+    doctest.testmod()

@@ -6,9 +6,11 @@ import traceback
 
 from adsk.core import Application, Matrix3D, Point3D, Vector3D, ValueInput, ObjectCollection, SurfaceTypes, Plane
 from adsk.fusion import Design, Component, FeatureOperations
-from .utils import boundary_fill_between_planes
+from .orientation import vert_spanwise_plane, point, chordwise_coord
+from .utils import boundary_fill_between_planes, relative_location
 from .utils import log_func
 from .utils import project_coord, centroid_of_bounding_box, find_coplanar_face, cell_between_planes
+from .orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
 from functools import partial
 
 ROOT_SKETCH = 'root-profile'
@@ -32,40 +34,9 @@ TRIANGLE_LEN_CM = 0.5
 LOGFILE = '/Users/andy/logs/create-ribs.log'
 log = partial(log_func, LOGFILE)
 
-VERT_DIRECTION = Vector3D.create(0., 0., 1.0)
-SPANWISE_DIRECTION = Vector3D.create(0., 1., 0.)
 
 ui = None
 
-
-def vert_spanwise_plane(comp):
-    return comp.yZConstructionPlane
-
-
-def chordwise_coord(point):
-    return point.x
-
-
-def point(chordwise, spanwise, vertical):
-    return Point3D.create(chordwise, spanwise, vertical)
-
-
-def relative_location(from_loc, to_loc, frac):
-    """
-    returns location that a given fraction of the distance between the from and to points
-    >>> relative_location(0,1,0.5)
-    0.5
-    >>> relative_location(-5,6,1)
-    6
-    >>> relative_location(-5,6,0)
-    -5
-    >>> relative_location(-5,15,0.75)
-    10.0
-    """
-    full_dist = to_loc - from_loc
-    dist = full_dist * frac
-    loc = from_loc + dist
-    return loc
 
 
 def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, rib_post_loc, rib_post_width):
@@ -95,8 +66,8 @@ def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, ri
 
     # get dimensions of post
     bounding_box = post.boundingBox
-    top = project_coord(bounding_box.maxPoint.asArray(), VERT_DIRECTION.asArray())
-    bottom = project_coord(bounding_box.minPoint.asArray(), VERT_DIRECTION.asArray())
+    top = project_coord(bounding_box.maxPoint.asArray(), VERTICAL_UP_DIRECTION.asArray())
+    bottom = project_coord(bounding_box.minPoint.asArray(), VERTICAL_UP_DIRECTION.asArray())
     spanwise_mid = project_coord(centroid_of_bounding_box(bounding_box).asArray(), SPANWISE_DIRECTION.asArray())
 
     log('top:', top, 'bottom:', bottom)

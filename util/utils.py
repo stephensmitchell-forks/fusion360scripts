@@ -128,6 +128,24 @@ def boundary_fill_between_planes(component, comp_occurrence, body, plane1, plane
         raise
 
 
+def relative_location(from_loc, to_loc, frac):
+    """
+    returns location that a given fraction of the distance between the from and to points
+    >>> relative_location(0,1,0.5)
+    0.5
+    >>> relative_location(-5,6,1)
+    6
+    >>> relative_location(-5,6,0)
+    -5
+    >>> relative_location(-5,15,0.75)
+    10.0
+    """
+    full_dist = to_loc - from_loc
+    dist = full_dist * frac
+    loc = from_loc + dist
+    return loc
+
+
 if __name__ == '__main__':
     import doctest
 
