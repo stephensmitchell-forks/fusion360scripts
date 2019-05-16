@@ -3,15 +3,15 @@
 
 import datetime as dt
 import traceback
+from functools import partial
 
-from adsk.core import Application, Matrix3D, Point3D, Vector3D, ValueInput, ObjectCollection, SurfaceTypes, Plane
+from adsk.core import Application, Matrix3D, ValueInput, ObjectCollection
 from adsk.fusion import Design, Component, FeatureOperations
+from .orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
 from .orientation import vert_spanwise_plane, point, chordwise_coord
 from .utils import boundary_fill_between_planes, relative_location
 from .utils import log_func
-from .utils import project_coord, centroid_of_bounding_box, find_coplanar_face, cell_between_planes
-from .orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
-from functools import partial
+from .utils import project_coord, centroid_of_bounding_box, find_coplanar_face
 
 ROOT_SKETCH = 'root-profile'
 TIP_SKETCH = 'tip-profile'
@@ -20,7 +20,7 @@ WING_BODY = 'skin'
 CREATE_COMPONENT_NAME = 'ribs'
 
 # rib locations in cm spanwise from root.
-RIB_STATIONS_CM = [0,2,4-0.12]
+RIB_STATIONS_CM = [0, 2, 4 - 0.12]
 # spanwise thickness of rib
 RIB_THICKNESS = "1.2 mm"
 # inset of rib from surface
@@ -34,9 +34,7 @@ TRIANGLE_LEN_CM = 0.5
 LOGFILE = '/Users/andy/logs/create-ribs.log'
 log = partial(log_func, LOGFILE)
 
-
 ui = None
-
 
 
 def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, rib_post_loc, rib_post_width):
@@ -93,16 +91,18 @@ def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, ri
     lines.addByTwoPoints(p3, p1)
 
     # extrude the 2 triangular profiles just created
-    assert sketch.profiles.count ==2, "expected 2 profiles in the sketch"
+    assert sketch.profiles.count == 2, "expected 2 profiles in the sketch"
     profile = sketch.profiles.item(0)
     extrudes = component.features.extrudeFeatures
-    top_triangle_extrusion = extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width), FeatureOperations.NewBodyFeatureOperation)
+    top_triangle_extrusion = extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width),
+                                                FeatureOperations.NewBodyFeatureOperation)
     top_triangle = top_triangle_extrusion.bodies.item(0)
     top_triangle.name = 'top_triangle'
 
     profile = sketch.profiles.item(1)
     extrudes = component.features.extrudeFeatures
-    bottom_triangle_extrusion = extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width), FeatureOperations.NewBodyFeatureOperation)
+    bottom_triangle_extrusion = extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width),
+                                                   FeatureOperations.NewBodyFeatureOperation)
     bottom_triangle = bottom_triangle_extrusion.bodies.item(0)
     bottom_triangle.name = 'bottom_triangle'
 
@@ -122,7 +122,6 @@ def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, ri
     combine_input.isNewComponent = False
     combine_input.operation = FeatureOperations.IntersectFeatureOperation
     combines.add(combine_input)
-
 
     return post
 
@@ -166,7 +165,6 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
     shell_feats.add(shell_feature_input)
 
 
-
 def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, thickness):
     """
     Creates 2 construction planes and a solid rib body using a boundary fill between the 2 planes and the wing body
@@ -191,8 +189,6 @@ def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from
     plane2.isLightBulbOn = False
 
     return rib_body, plane1, plane2
-
-
 
 
 def run(context):
@@ -251,55 +247,6 @@ def run(context):
         if ui:
             ui.messageBox(msg)
 
-
-
-
-
-# def cell_in_the_middle(cells):
-#     """ from a list of 3 cells, return the one in the middle.
-#     """
-#     assert len(cells) == 3, "expected 3 cells - ensure the main body is solid and not shelled"
-#     # find centroids of bounding boxes
-#     bounding_boxes = [c.cellBody.boundingBox for c in cells]
-#     centroids = [centroid_of_bounding_box(bb) for bb in bounding_boxes]
-#     idx = index_of_point_in_middle(centroids)
-#     return cells[idx]
-
-
-
-
-# def index_of_point_in_middle(points):
-#     """ determine which point is in the middle of 3 approximately colinear points in space.
-#         This is done by taking each point in turn, and looking at the directions of the vectors
-#         to the other 2 points. The point in the middle should have these vectors in approx
-#         opposite directions. This can be checked by looking at the sign of the dot product
-#         between the vectors.
-#     """
-#     assert len(points) == 3, "expected3 points"
-#     dots = []
-#     for i in range(3):
-#         a = points[i]
-#         b = points[(i + 1) % 3]
-#         c = points[(i + 2) % 3]
-#         ab = b.copy()
-#         ab.subtract(a)
-#         ab.normalize()
-#         ac = c.copy()
-#         ac.subtract(a)
-#         ac.normalize()
-#         dot = ab.dotProduct(ac)
-#         dots.append(dot)
-#
-#     # log("dots: {}".format(dots))
-#
-#     negative_dots = [d for d in dots if d < 0]
-#     assert len(negative_dots) == 1, "expected exactly 1 negative dot product."
-#
-#     # return index of the negative dot product
-#     for i in range(len(dots)):
-#         if dots[i] < 0:
-#             return i
-#
 
 if __name__ == '__main__':
     import doctest
