@@ -10,8 +10,16 @@ from adsk.fusion import Design, Component, FeatureOperations
 from .orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
 from .orientation import vert_spanwise_plane, point, chordwise_coord
 from .utils import boundary_fill_between_planes, relative_location
+from .utils import load_settings
 from .utils import log_func
 from .utils import project_coord, centroid_of_bounding_box, find_coplanar_face
+
+
+app = Application.get()
+des = Design.cast(app.activeProduct)
+ui = app.userInterface
+settings = load_settings('ribSettings', ui)
+
 
 ROOT_SKETCH = 'root-profile'
 TIP_SKETCH = 'tip-profile'
@@ -20,21 +28,24 @@ WING_BODY = 'skin'
 CREATE_COMPONENT_NAME = 'ribs'
 
 # rib locations in cm spanwise from root.
-RIB_STATIONS_CM = [0, 2, 4 - 0.12]
+# RIB_STATIONS_CM = [0, 2, 4 - 0.12]
+RIB_STATIONS_CM = [0, 2, 4, 6, 8, 10 - 0.12]
 # spanwise thickness of rib
 RIB_THICKNESS = "1.2 mm"
 # inset of rib from surface
 RIB_INSET = "0.8 mm"
 # chordwise positions of rib verticals posts in cm (at root position. locations proportional elsewhere)
-RIB_POST_ROOT_LOCS_CM = [2.5, 5.0, 7.5, 10, 12.5]
+# RIB_POST_ROOT_LOCS_CM = [2.5, 5.0, 7.5 , 10, 12.5]
+RIB_POST_ROOT_LOCS_CM = [1.0, 2, 3, 4, 5]
 # chordwise width of rib posts
 RIB_POST_WIDTH_CM = 0.1
-TRIANGLE_LEN_CM = 0.5
+TRIANGLE_LEN_CM = 0.2
 
 LOGFILE = '/Users/andy/logs/create-ribs.log'
 log = partial(log_func, LOGFILE)
 
 ui = None
+
 
 
 def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, rib_post_loc, rib_post_width):
@@ -74,54 +85,58 @@ def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, ri
     sketch = component.sketches.add(plane2, comp_occurrence)
     lines = sketch.sketchCurves.sketchLines
 
-    p1 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid, vertical=top - TRIANGLE_LEN_CM))
-    p2 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid + TRIANGLE_LEN_CM, vertical=top))
-    p3 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid - TRIANGLE_LEN_CM, vertical=top))
+    tri_side = TRIANGLE_LEN_CM
 
-    lines.addByTwoPoints(p1, p2)
-    lines.addByTwoPoints(p2, p3)
-    lines.addByTwoPoints(p3, p1)
+    # only create triangles if the section is tall enough
+    if top - bottom > 2 * tri_side:
+        p1 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid, vertical=top - tri_side))
+        p2 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid + tri_side, vertical=top))
+        p3 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid - tri_side, vertical=top))
 
-    p1 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid, vertical=bottom + TRIANGLE_LEN_CM))
-    p2 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid + TRIANGLE_LEN_CM, vertical=bottom))
-    p3 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid - TRIANGLE_LEN_CM, vertical=bottom))
+        lines.addByTwoPoints(p1, p2)
+        lines.addByTwoPoints(p2, p3)
+        lines.addByTwoPoints(p3, p1)
 
-    lines.addByTwoPoints(p1, p2)
-    lines.addByTwoPoints(p2, p3)
-    lines.addByTwoPoints(p3, p1)
+        p1 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid, vertical=bottom + tri_side))
+        p2 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid + tri_side, vertical=bottom))
+        p3 = sketch.modelToSketchSpace(point(chordwise=p1loc, spanwise=spanwise_mid - tri_side, vertical=bottom))
 
-    # extrude the 2 triangular profiles just created
-    assert sketch.profiles.count == 2, "expected 2 profiles in the sketch"
-    profile = sketch.profiles.item(0)
-    extrudes = component.features.extrudeFeatures
-    top_triangle_extrusion = extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width),
-                                                FeatureOperations.NewBodyFeatureOperation)
-    top_triangle = top_triangle_extrusion.bodies.item(0)
-    top_triangle.name = 'top_triangle'
+        lines.addByTwoPoints(p1, p2)
+        lines.addByTwoPoints(p2, p3)
+        lines.addByTwoPoints(p3, p1)
 
-    profile = sketch.profiles.item(1)
-    extrudes = component.features.extrudeFeatures
-    bottom_triangle_extrusion = extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width),
-                                                   FeatureOperations.NewBodyFeatureOperation)
-    bottom_triangle = bottom_triangle_extrusion.bodies.item(0)
-    bottom_triangle.name = 'bottom_triangle'
+        # extrude the 2 triangular profiles just created
+        assert sketch.profiles.count == 2, "expected 2 triangle profiles in the sketch just created"
+        profile = sketch.profiles.item(0)
+        extrudes = component.features.extrudeFeatures
+        top_triangle_extrusion = extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width),
+                                                    FeatureOperations.NewBodyFeatureOperation)
+        top_triangle = top_triangle_extrusion.bodies.item(0)
+        top_triangle.name = 'top_triangle'
 
-    # now trim the triangles to the intersection with the wing body
-    tool_bodies = ObjectCollection.create()
-    tool_bodies.add(wing_body)
-    combines = component.features.combineFeatures
+        profile = sketch.profiles.item(1)
+        extrudes = component.features.extrudeFeatures
+        bottom_triangle_extrusion = extrudes.addSimple(profile, ValueInput.createByReal(rib_post_width),
+                                                       FeatureOperations.NewBodyFeatureOperation)
+        bottom_triangle = bottom_triangle_extrusion.bodies.item(0)
+        bottom_triangle.name = 'bottom_triangle'
 
-    combine_input = combines.createInput(top_triangle, tool_bodies)
-    combine_input.isKeepToolBodies = True
-    combine_input.isNewComponent = False
-    combine_input.operation = FeatureOperations.IntersectFeatureOperation
-    combines.add(combine_input)
+        # now trim the triangles to the intersection with the wing body
+        tool_bodies = ObjectCollection.create()
+        tool_bodies.add(wing_body)
+        combines = component.features.combineFeatures
 
-    combine_input = combines.createInput(bottom_triangle, tool_bodies)
-    combine_input.isKeepToolBodies = True
-    combine_input.isNewComponent = False
-    combine_input.operation = FeatureOperations.IntersectFeatureOperation
-    combines.add(combine_input)
+        combine_input = combines.createInput(top_triangle, tool_bodies)
+        combine_input.isKeepToolBodies = True
+        combine_input.isNewComponent = False
+        combine_input.operation = FeatureOperations.IntersectFeatureOperation
+        combines.add(combine_input)
+
+        combine_input = combines.createInput(bottom_triangle, tool_bodies)
+        combine_input.isKeepToolBodies = True
+        combine_input.isNewComponent = False
+        combine_input.operation = FeatureOperations.IntersectFeatureOperation
+        combines.add(combine_input)
 
     return post
 
@@ -205,6 +220,7 @@ def run(context):
         ui = app.userInterface
         root = Component.cast(des.rootComponent)
 
+
         # locate the root and tip sketches
         root_sketch = root.sketches.itemByName(ROOT_SKETCH)
         if root_sketch is None:
@@ -241,11 +257,11 @@ def run(context):
                        '{} cm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name,
                        rib_vertical_fracs, RIB_POST_WIDTH_CM)
 
-    except:
+    except Exception as ex:
         msg = 'Failed:\n{}'.format(traceback.format_exc())
         log(msg)
         if ui:
-            ui.messageBox(msg)
+            ui.messageBox(str(ex))
 
 
 if __name__ == '__main__':

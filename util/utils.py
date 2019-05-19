@@ -1,7 +1,48 @@
+import doctest
 import math
+import os.path
+import unittest
 
-from adsk.core import Vector3D, Point3D, SurfaceTypes, Plane, ObjectCollection
+from adsk.core import Vector3D, Point3D, SurfaceTypes, Plane, ObjectCollection, Application
 from adsk.fusion import FeatureOperations
+
+
+def load_settings(user_parameter_name, ui):
+    """
+    Reads a filename from the comment field of the given parameter
+    and loads settings from the file.
+    :param user_parameter_name: name of the user parameter to read
+    :return: map of settings
+    """
+    try:
+        app = Application.get()
+        design = app.activeProduct
+        param = design.userParameters.itemByName(user_parameter_name)
+        if param is None:
+            raise Exception("No user parameter '{}' defined.".format(user_parameter_name))
+
+        filename = param.comment
+        if filename is None or not (os.path.exists(filename) and os.path.isfile(filename)):
+            raise Exception(
+                "Expected comment field of parameter {} to contain the pathame of a settings file but was '{}'"
+                    .format(user_parameter_name, filename))
+
+        return load_settings_from_file(filename)
+    except Exception as ex:
+
+        if ui:
+            ui.messageBox(str(ex))
+
+
+def load_settings_from_file(filename):
+    """
+    loads settings from the specified file, which is assumed to be in python.
+    """
+    assert os.path.exists(filename), "settings file: '{}' does not exist".format(filename)
+    assert os.path.isfile(filename), "settings file: '{}' is not a file".format(filename)
+
+    with open(filename, 'r') as f:
+        exec(f.read())
 
 
 def to_string(x):
@@ -146,7 +187,32 @@ def relative_location(from_loc, to_loc, frac):
     return loc
 
 
-if __name__ == '__main__':
-    import doctest
+class Tests(unittest.TestCase):
+    def test_load_settings_from_file(self):
+        """
+        loads some example settings from a file and checks that the contents get set in the current environment
+        """
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        test_file = os.path.join(script_dir, 'test/test_settings.py')
 
-    doctest.testmod()
+        global TEST_SETTING, TEST_LIST
+        load_settings_from_file(test_file)
+        self.assertEqual(TEST_SETTING, 42)
+        self.assertEqual(TEST_LIST, [0, 2, 4])
+
+
+def load_tests(loader, tests, ignore):
+    """ test loader to include doctest into unit test suite"""
+    tests.addTests(doctest.DocTestSuite())
+    return tests
+
+
+if __name__ == '__main__':
+    # #doctest.testmod()
+    #
+    # test_suite = unittest.TestSuite()
+    # #test_suite.addTests(unittest.makeSuite(Tests))
+    # test_suite.addTest(doctest.DocTestSuite())
+    # unittest.TextTestRunner(verbosity = 2).run(test_suite)
+
+    unittest.main()

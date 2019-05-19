@@ -7,7 +7,7 @@ import traceback
 from functools import partial
 
 from adsk.core import Application, Matrix3D, ValueInput, Point3D, ObjectCollection
-from adsk.fusion import Design, Component, FeatureOperations, ExtentDirections
+from adsk.fusion import Design, Component, FeatureOperations
 from .orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
 from .utils import boundary_fill_between_planes, project_coord
 from .utils import log_func
@@ -96,11 +96,12 @@ def create_spar_from_line(component, component_occurrence, wing_body, spar_lines
 
     # sketch origin seems to be centered on the body. x seems to be spanwise
     # TODO: formalise this, for different part orientations. Need a way to deduce sketch orientation
-    x_offset = (max_spanwise-min_spanwise)/2
+    x_offset = (max_spanwise - min_spanwise) / 2
     # create circles
     for loc in circle_locs:
-        spar_face_sketch.sketchCurves.sketchCircles.addByCenterRadius(Point3D.create(loc-x_offset, vertical_center, 0),
-                                                            CIRCLE_DIAMETER_CM / 2)
+        spar_face_sketch.sketchCurves.sketchCircles.addByCenterRadius(
+            Point3D.create(loc - x_offset, vertical_center, 0),
+            CIRCLE_DIAMETER_CM / 2)
 
     profiles = ObjectCollection.create()
     for c in spar_face_sketch.profiles:
@@ -109,7 +110,7 @@ def create_spar_from_line(component, component_occurrence, wing_body, spar_lines
     extrudes = component.features.extrudeFeatures
     extrude_input = extrudes.createInput(profiles, FeatureOperations.CutFeatureOperation)
     # extrude_input.setAllExtent(ExtentDirections.SymmetricExtentDirection)
-    distanceForCut = ValueInput.createByString('2 cm') # some distance > we need.
+    distanceForCut = ValueInput.createByString('2 cm')  # some distance > we need.
     extrude_input.setSymmetricExtent(distanceForCut, True)
     extrude_input.participantBodies = [spar]
 
@@ -157,11 +158,11 @@ def run(context):
 
         ui.messageBox('done')
 
-    except:
+    except Exception as ex:
         msg = 'Failed:\n{}'.format(traceback.format_exc())
         log(msg)
         if ui:
-            ui.messageBox(msg)
+            ui.messageBox(str(ex))
 
 
 if __name__ == '__main__':
