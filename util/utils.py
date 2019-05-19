@@ -41,9 +41,11 @@ def load_settings_from_file(filename):
     assert os.path.exists(filename), "settings file: '{}' does not exist".format(filename)
     assert os.path.isfile(filename), "settings file: '{}' is not a file".format(filename)
 
-    with open(filename, 'r') as f:
-        exec(f.read())
-
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("settings", filename)
+    settings = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(settings)
+    return settings
 
 def to_string(x):
     """
@@ -195,10 +197,9 @@ class Tests(unittest.TestCase):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         test_file = os.path.join(script_dir, 'test/test_settings.py')
 
-        global TEST_SETTING, TEST_LIST
-        load_settings_from_file(test_file)
-        self.assertEqual(TEST_SETTING, 42)
-        self.assertEqual(TEST_LIST, [0, 2, 4])
+        settings = load_settings_from_file(test_file)
+        self.assertEqual(settings.TEST_SETTING, 42)
+        self.assertEqual(settings.TEST_LIST, [0, 2, 4])
 
 
 def load_tests(loader, tests, ignore):
