@@ -20,32 +20,9 @@ des = Design.cast(app.activeProduct)
 ui = app.userInterface
 settings = load_settings('ribSettings', ui)
 
-
-ROOT_SKETCH = 'root-profile'
-TIP_SKETCH = 'tip-profile'
-WING_BODY = 'skin'
-
-CREATE_COMPONENT_NAME = 'ribs'
-
-# rib locations in cm spanwise from root.
-# RIB_STATIONS_CM = [0, 2, 4 - 0.12]
-RIB_STATIONS_CM = [0, 2, 4, 6, 8, 10 - 0.12]
-# spanwise thickness of rib
-RIB_THICKNESS = "1.2 mm"
-# inset of rib from surface
-RIB_INSET = "0.8 mm"
-# chordwise positions of rib verticals posts in cm (at root position. locations proportional elsewhere)
-# RIB_POST_ROOT_LOCS_CM = [2.5, 5.0, 7.5 , 10, 12.5]
-RIB_POST_ROOT_LOCS_CM = [1.0, 2, 3, 4, 5]
-# chordwise width of rib posts
-RIB_POST_WIDTH_CM = 0.1
-TRIANGLE_LEN_CM = 0.2
-
-LOGFILE = '/Users/andy/logs/create-ribs.log'
-log = partial(log_func, LOGFILE)
+log = partial(log_func, settings.LOGFILE)
 
 ui = None
-
 
 
 def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, rib_post_loc, rib_post_width):
@@ -85,7 +62,7 @@ def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, ri
     sketch = component.sketches.add(plane2, comp_occurrence)
     lines = sketch.sketchCurves.sketchLines
 
-    tri_side = TRIANGLE_LEN_CM
+    tri_side = settings.RIB_POST_TRIANGLE_LEN_CM
 
     # only create triangles if the section is tall enough
     if top - bottom > 2 * tri_side:
@@ -220,20 +197,19 @@ def run(context):
         ui = app.userInterface
         root = Component.cast(des.rootComponent)
 
-
         # locate the root and tip sketches
-        root_sketch = root.sketches.itemByName(ROOT_SKETCH)
+        root_sketch = root.sketches.itemByName(settings.ROOT_SKETCH)
         if root_sketch is None:
-            raise ValueError('Root sketch "{}" not found'.format(ROOT_SKETCH))
+            raise ValueError('Root sketch "{}" not found'.format(settings.ROOT_SKETCH))
 
-        tip_sketch = root.sketches.itemByName(TIP_SKETCH)
+        tip_sketch = root.sketches.itemByName(settings.TIP_SKETCH)
         if tip_sketch is None:
-            raise ValueError('Tip sketch "{}" not found'.format(TIP_SKETCH))
+            raise ValueError('Tip sketch "{}" not found'.format(settings.TIP_SKETCH))
 
         # locate the wing body
-        wing_body = root.bRepBodies.itemByName(WING_BODY)
+        wing_body = root.bRepBodies.itemByName(settings.WING_BODY)
         if wing_body is None:
-            raise ValueError('Wing body "{}" not found'.format(WING_BODY))
+            raise ValueError('Wing body "{}" not found'.format(settings.WING_BODY))
 
         # find the chordwise extremities of the wing body
         start_coord = chordwise_coord(wing_body.boundingBox.minPoint)
@@ -241,21 +217,21 @@ def run(context):
         chord_length = end_coord - start_coord
         log('start, end, chord length', start_coord, end_coord, chord_length)
 
-        rib_vertical_fracs = [r / chord_length for r in RIB_POST_ROOT_LOCS_CM]
-        log('rib vertical positions (mm)', RIB_POST_ROOT_LOCS_CM)
+        rib_vertical_fracs = [r / chord_length for r in settings.RIB_POST_ROOT_LOCS_CM]
+        log('rib vertical positions (mm)', settings.RIB_POST_ROOT_LOCS_CM)
         log('rib vertical relative positions', rib_vertical_fracs)
 
         # create new component
         component_occurrence = root.occurrences.addNewComponent(Matrix3D.create())
         component = Component.cast(component_occurrence.component)
-        component.name = CREATE_COMPONENT_NAME
+        component.name = settings.CREATE_COMPONENT_NAME
 
         # now create the ribs
-        for rib_id, rs in enumerate(RIB_STATIONS_CM):
+        for rib_id, rs in enumerate(settings.RIB_STATIONS_CM):
             rib_name = "rib_{}".format(rib_id + 1)
             create_rib(wing_body, root_sketch, component, component_occurrence,
-                       '{} cm'.format(rs), RIB_THICKNESS, RIB_INSET, rib_name,
-                       rib_vertical_fracs, RIB_POST_WIDTH_CM)
+                       '{} cm'.format(rs), settings.RIB_THICKNESS, settings.RIB_INSET, rib_name,
+                       rib_vertical_fracs, settings.RIB_POST_WIDTH_CM)
 
     except Exception as ex:
         msg = 'Failed:\n{}'.format(traceback.format_exc())

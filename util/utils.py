@@ -28,10 +28,11 @@ def load_settings(user_parameter_name, ui):
                     .format(user_parameter_name, filename))
 
         return load_settings_from_file(filename)
-    except Exception as ex:
 
+    except Exception as ex:
         if ui:
             ui.messageBox(str(ex))
+        raise ex
 
 
 def load_settings_from_file(filename):
@@ -46,6 +47,7 @@ def load_settings_from_file(filename):
     settings = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(settings)
     return settings
+
 
 def to_string(x):
     """
