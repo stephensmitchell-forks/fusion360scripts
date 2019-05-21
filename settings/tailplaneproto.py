@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-# wing rib creation settings file
+# wing creation settings file
 
 # name of a file to log diagnostics and errors
 LOGFILE = '/Users/andy/logs/script_output.log'
 
-# name to give the created component
-CREATE_COMPONENT_NAME = 'ribs'
+# -----------------------------------------
+# Settings used by Wing Ribs script
+# -----------------------------------------
 
-ROOT_SKETCH = 'root-profile'
-TIP_SKETCH = 'tip-profile'
+# name of the wing body - used by WingRibs and CreateSpars
 WING_BODY = 'skin'
+
+
+RIB_ROOT_SKETCH = 'root-profile'
+
+# name to give the created component
+RIB_COMPONENT_NAME = 'ribs'
 
 # rib locations in cm spanwise at root.
 RIB_STATIONS_CM = [0, 3, 6 - 0.12]
@@ -28,3 +34,12 @@ RIB_POST_WIDTH_CM = 0.1
 
 # length of side of the triangular pieces on top and bottom of rib posts
 RIB_POST_TRIANGLE_LEN_CM = 0.5
+
+# -----------------------------------------
+# settings for CreateSpars
+# -----------------------------------------
+SPARS_SKETCH = 'spars'
+SPARS_COMPONENT_NAME = 'spars'
+SPAR_THICKNESS_CM = 0.1
+SPAR_CIRCLE_DIAMETER_CM = 0.8
+SPAR_CIRCLE_SPACING_CM = 0.8

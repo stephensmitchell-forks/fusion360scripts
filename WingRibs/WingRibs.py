@@ -33,9 +33,9 @@ def run(context):
         root = Component.cast(design.rootComponent)
 
         # locate the root sketch
-        root_sketch = root.sketches.itemByName(settings.ROOT_SKETCH)
+        root_sketch = root.sketches.itemByName(settings.RIB_ROOT_SKETCH)
         if root_sketch is None:
-            raise ValueError('Root sketch "{}" not found'.format(settings.ROOT_SKETCH))
+            raise ValueError('Root sketch "{}" not found'.format(settings.RIB_ROOT_SKETCH))
 
         # locate the wing body
         wing_body = root.bRepBodies.itemByName(settings.WING_BODY)
@@ -55,7 +55,7 @@ def run(context):
         # create new component
         component_occurrence = root.occurrences.addNewComponent(Matrix3D.create())
         component = Component.cast(component_occurrence.component)
-        component.name = settings.CREATE_COMPONENT_NAME
+        component.name = settings.RIB_COMPONENT_NAME
 
         # now create the ribs
         for rib_id, rs in enumerate(settings.RIB_STATIONS_CM):

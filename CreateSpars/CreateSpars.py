@@ -9,7 +9,7 @@ from functools import partial
 from adsk.core import Application, Matrix3D, ValueInput, Point3D, ObjectCollection
 from adsk.fusion import Design, Component, FeatureOperations
 from .orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
-from .utils import boundary_fill_between_planes, project_coord
+from .utils import boundary_fill_between_planes, project_coord, load_settings
 from .utils import log_func
 
 """
@@ -20,15 +20,11 @@ Inputs:
     name of spars sketch
 """
 
-WING_BODY = 'skin'
-SPARS_SKETCH = 'spars'
-CREATE_COMPONENT_NAME = 'spars'
-SPAR_THICKNESS_CM = 0.1
-CIRCLE_DIAMETER_CM = 0.5
-CIRCLE_SPACING_CM = 0.6
-
-LOGFILE = '/Users/andy/logs/create-spars.log'
-log = partial(log_func, LOGFILE)
+app = Application.get()
+design = Design.cast(app.activeProduct)
+ui = app.userInterface
+settings = load_settings(design.userParameters, 'ribSettings', ui)
+log = partial(log_func, settings.LOGFILE)
 
 
 def horizontal_plane(component):
@@ -86,10 +82,10 @@ def create_spar_from_line(component, component_occurrence, wing_body, spar_lines
     # create sketch and draw circles in a row spanwise
     spar_face_sketch = component.sketches.add(center_plane)
     circle_locs = []
-    loc = min_spanwise + CIRCLE_SPACING_CM
-    while loc + CIRCLE_DIAMETER_CM / 2 < max_spanwise:
+    loc = min_spanwise + settings.SPAR_CIRCLE_SPACING_CM
+    while loc + settings.SPAR_CIRCLE_DIAMETER_CM / 2 < max_spanwise:
         circle_locs.append(loc)
-        loc = loc + CIRCLE_SPACING_CM
+        loc = loc + settings.SPAR_CIRCLE_SPACING_CM
 
     log('Circle locs:', circle_locs)
     vertical_center = 0
@@ -101,7 +97,7 @@ def create_spar_from_line(component, component_occurrence, wing_body, spar_lines
     for loc in circle_locs:
         spar_face_sketch.sketchCurves.sketchCircles.addByCenterRadius(
             Point3D.create(loc - x_offset, vertical_center, 0),
-            CIRCLE_DIAMETER_CM / 2)
+            settings.SPAR_CIRCLE_DIAMETER_CM / 2)
 
     profiles = ObjectCollection.create()
     for c in spar_face_sketch.profiles:
@@ -134,25 +130,25 @@ def run(context):
         root = Component.cast(des.rootComponent)
 
         # locate the spars sketch
-        sketch = root.sketches.itemByName(SPARS_SKETCH)
+        sketch = root.sketches.itemByName(settings.SPARS_SKETCH)
         if sketch is None:
-            raise ValueError('Sketch "{}" not found'.format(SPARS_SKETCH))
+            raise ValueError('Sketch "{}" not found'.format(settings.SPARS_SKETCH))
 
         # locate the wing body
-        wing_body = root.bRepBodies.itemByName(WING_BODY)
+        wing_body = root.bRepBodies.itemByName(settings.WING_BODY)
         if wing_body is None:
-            raise ValueError('Wing body "{}" not found'.format(WING_BODY))
+            raise ValueError('Wing body "{}" not found'.format(settings.WING_BODY))
 
         # create new component
         component_occurrence = root.occurrences.addNewComponent(Matrix3D.create())
         component = Component.cast(component_occurrence.component)
-        component.name = CREATE_COMPONENT_NAME
+        component.name = settings.SPARS_COMPONENT_NAME
 
         # now create the spars, one for each line on the sketch.
         lines = sketch.sketchCurves.sketchLines
         log('num lines:', lines.count)
         for i, line in enumerate(lines):
-            spar = create_spar_from_line(component, component_occurrence, wing_body, sketch, line, SPAR_THICKNESS_CM)
+            spar = create_spar_from_line(component, component_occurrence, wing_body, sketch, line, settings.SPAR_THICKNESS_CM)
             spar.name = "spar_{}".format(i + 1)
             log('Created spar', spar.name)
 
