@@ -7,17 +7,17 @@ from adsk.core import Vector3D, Point3D, SurfaceTypes, Plane, ObjectCollection, 
 from adsk.fusion import FeatureOperations
 
 
-def load_settings(user_parameter_name, ui):
+def load_settings(user_parameters, user_parameter_name, ui):
     """
     Reads a filename from the comment field of the given parameter
     and loads settings from the file.
+    :param the collection of user parameters
     :param user_parameter_name: name of the user parameter to read
+    :param reference to the UI, used to report errors. (Since logfile typically not yet opened)
     :return: map of settings
     """
     try:
-        app = Application.get()
-        design = app.activeProduct
-        param = design.userParameters.itemByName(user_parameter_name)
+        param = user_parameters.itemByName(user_parameter_name)
         if param is None:
             raise Exception("No user parameter '{}' defined.".format(user_parameter_name))
 

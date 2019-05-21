@@ -2,7 +2,7 @@
 # wing rib creation settings file
 
 # name of a file to log diagnostics and errors
-LOGFILE = '/Users/andy/logs/create-ribs.log'
+LOGFILE = '/Users/andy/logs/script_output.log'
 
 # name to give the created component
 CREATE_COMPONENT_NAME = 'ribs'
@@ -11,7 +11,7 @@ ROOT_SKETCH = 'root-profile'
 TIP_SKETCH = 'tip-profile'
 WING_BODY = 'skin'
 
-# rib locations in cm spanwise from root.
+# rib locations in cm spanwise at root.
 RIB_STATIONS_CM = [0, 3, 6 - 0.12]
 
 # spanwise thickness of rib

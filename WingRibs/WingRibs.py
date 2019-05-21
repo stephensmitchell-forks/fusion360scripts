@@ -14,15 +14,61 @@ from .utils import load_settings
 from .utils import log_func
 from .utils import project_coord, centroid_of_bounding_box, find_coplanar_face
 
-
 app = Application.get()
-des = Design.cast(app.activeProduct)
+design = Design.cast(app.activeProduct)
 ui = app.userInterface
-settings = load_settings('ribSettings', ui)
-
+settings = load_settings(design.userParameters, 'ribSettings', ui)
 log = partial(log_func, settings.LOGFILE)
 
-ui = None
+
+def run(context):
+    """
+    Main entrypoint
+    """
+    global ui
+    try:
+        log('--------------------------------')
+        log(dt.datetime.now(), __file__)
+        log()
+        root = Component.cast(design.rootComponent)
+
+        # locate the root sketch
+        root_sketch = root.sketches.itemByName(settings.ROOT_SKETCH)
+        if root_sketch is None:
+            raise ValueError('Root sketch "{}" not found'.format(settings.ROOT_SKETCH))
+
+        # locate the wing body
+        wing_body = root.bRepBodies.itemByName(settings.WING_BODY)
+        if wing_body is None:
+            raise ValueError('Wing body "{}" not found'.format(settings.WING_BODY))
+
+        # find the chordwise extremities of the wing body
+        start_coord = chordwise_coord(wing_body.boundingBox.minPoint)
+        end_coord = chordwise_coord(wing_body.boundingBox.maxPoint)
+        chord_length = end_coord - start_coord
+        log('start, end, chord length', start_coord, end_coord, chord_length)
+
+        rib_vertical_fracs = [r / chord_length for r in settings.RIB_POST_ROOT_LOCS_CM]
+        log('rib vertical positions (mm)', settings.RIB_POST_ROOT_LOCS_CM)
+        log('rib vertical relative positions', rib_vertical_fracs)
+
+        # create new component
+        component_occurrence = root.occurrences.addNewComponent(Matrix3D.create())
+        component = Component.cast(component_occurrence.component)
+        component.name = settings.CREATE_COMPONENT_NAME
+
+        # now create the ribs
+        for rib_id, rs in enumerate(settings.RIB_STATIONS_CM):
+            rib_name = "rib_{}".format(rib_id + 1)
+            create_rib(wing_body, root_sketch, component, component_occurrence,
+                       '{} cm'.format(rs), settings.RIB_THICKNESS, settings.RIB_INSET, rib_name,
+                       rib_vertical_fracs, settings.RIB_POST_WIDTH_CM)
+
+    except Exception as ex:
+        msg = 'Failed:\n{}'.format(traceback.format_exc())
+        log(msg)
+        if ui:
+            ui.messageBox(str(ex))
 
 
 def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, rib_post_loc, rib_post_width):
@@ -181,63 +227,6 @@ def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from
     plane2.isLightBulbOn = False
 
     return rib_body, plane1, plane2
-
-
-def run(context):
-    """
-    Main entrypoint
-    """
-    global ui
-    try:
-        log('--------------------------------')
-        log(dt.datetime.now(), __file__)
-        log()
-        app = Application.get()
-        des = Design.cast(app.activeProduct)
-        ui = app.userInterface
-        root = Component.cast(des.rootComponent)
-
-        # locate the root and tip sketches
-        root_sketch = root.sketches.itemByName(settings.ROOT_SKETCH)
-        if root_sketch is None:
-            raise ValueError('Root sketch "{}" not found'.format(settings.ROOT_SKETCH))
-
-        tip_sketch = root.sketches.itemByName(settings.TIP_SKETCH)
-        if tip_sketch is None:
-            raise ValueError('Tip sketch "{}" not found'.format(settings.TIP_SKETCH))
-
-        # locate the wing body
-        wing_body = root.bRepBodies.itemByName(settings.WING_BODY)
-        if wing_body is None:
-            raise ValueError('Wing body "{}" not found'.format(settings.WING_BODY))
-
-        # find the chordwise extremities of the wing body
-        start_coord = chordwise_coord(wing_body.boundingBox.minPoint)
-        end_coord = chordwise_coord(wing_body.boundingBox.maxPoint)
-        chord_length = end_coord - start_coord
-        log('start, end, chord length', start_coord, end_coord, chord_length)
-
-        rib_vertical_fracs = [r / chord_length for r in settings.RIB_POST_ROOT_LOCS_CM]
-        log('rib vertical positions (mm)', settings.RIB_POST_ROOT_LOCS_CM)
-        log('rib vertical relative positions', rib_vertical_fracs)
-
-        # create new component
-        component_occurrence = root.occurrences.addNewComponent(Matrix3D.create())
-        component = Component.cast(component_occurrence.component)
-        component.name = settings.CREATE_COMPONENT_NAME
-
-        # now create the ribs
-        for rib_id, rs in enumerate(settings.RIB_STATIONS_CM):
-            rib_name = "rib_{}".format(rib_id + 1)
-            create_rib(wing_body, root_sketch, component, component_occurrence,
-                       '{} cm'.format(rs), settings.RIB_THICKNESS, settings.RIB_INSET, rib_name,
-                       rib_vertical_fracs, settings.RIB_POST_WIDTH_CM)
-
-    except Exception as ex:
-        msg = 'Failed:\n{}'.format(traceback.format_exc())
-        log(msg)
-        if ui:
-            ui.messageBox(str(ex))
 
 
 if __name__ == '__main__':
