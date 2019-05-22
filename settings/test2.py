@@ -4,22 +4,31 @@
 # name of a file to log diagnostics and errors
 LOGFILE = '/Users/andy/logs/script_output.log'
 
-# name to give the created component
-CREATE_COMPONENT_NAME = 'ribs'
+# -----------------------------------------
+# Settings used by Wing Ribs script
+# -----------------------------------------
 
-ROOT_SKETCH = 'root-profile'
-TIP_SKETCH = 'tip-profile'
+# name of the wing body - used by WingRibs and CreateSpars
 WING_BODY = 'skin'
 
 
-# rib locations in cm spanwise at root.
-RIB_STATIONS_CM = [0, 2, 4, 6, 8, 10 - 0.12]
+RIB_ROOT_SKETCH = 'root-profile'
+
+# name to give the created component
+RIB_COMPONENT_NAME = 'ribs'
 
 # spanwise thickness of rib
-RIB_THICKNESS = "1.2 mm"
+RIB_THICKNESS_CM = 0.12
 
 # inset of rib from surface
-RIB_INSET = "0.8 mm"
+RIB_INSET_CM = 0.08
+
+# rib locations in cm spanwise at root.
+RIB_STATIONS_CM = [0, 2, 4, 6, 8, 10 - RIB_THICKNESS_CM]
+
+# are rib post locations proportional to chord, (e.g. for tapered wings) or absolute
+RIB_POST_LOC_TYPE='absolute'
+
 
 # chordwise positions of rib verticals posts in cm (at root position. locations proportional elsewhere)
 # RIB_POST_ROOT_LOCS_CM = [2.5, 5.0, 7.5 , 10, 12.5]

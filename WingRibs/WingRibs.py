@@ -5,7 +5,7 @@ import datetime as dt
 import traceback
 from functools import partial
 
-from adsk.core import Application, Matrix3D, ValueInput, ObjectCollection
+from adsk.core import Application, Matrix3D, ValueInput, ObjectCollection, DocumentTypes
 from adsk.fusion import Design, Component, FeatureOperations
 from .orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
 from .orientation import vert_spanwise_plane, point, chordwise_coord
@@ -48,8 +48,11 @@ def run(context):
         chord_length = end_coord - start_coord
         log('start, end, chord length', start_coord, end_coord, chord_length)
 
+        rib_post_loc_type = settings.RIB_POST_LOC_TYPE
+
+
         rib_vertical_fracs = [r / chord_length for r in settings.RIB_POST_ROOT_LOCS_CM]
-        log('rib vertical positions (mm)', settings.RIB_POST_ROOT_LOCS_CM)
+        log('rib vertical positions', settings.RIB_POST_ROOT_LOCS_CM)
         log('rib vertical relative positions', rib_vertical_fracs)
 
         # create new component
@@ -58,10 +61,10 @@ def run(context):
         component.name = settings.RIB_COMPONENT_NAME
 
         # now create the ribs
-        for rib_id, rs in enumerate(settings.RIB_STATIONS_CM):
+        for rib_id, rib_dist_from_root in enumerate(settings.RIB_STATIONS_CM):
             rib_name = "rib_{}".format(rib_id + 1)
             create_rib(wing_body, root_sketch, component, component_occurrence,
-                       '{} cm'.format(rs), settings.RIB_THICKNESS, settings.RIB_INSET, rib_name,
+                       rib_dist_from_root, settings.RIB_THICKNESS_CM, settings.RIB_INSET_CM, rib_name,
                        rib_vertical_fracs, settings.RIB_POST_WIDTH_CM)
 
     except Exception as ex:
@@ -198,7 +201,7 @@ def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_roo
     shell_feats = component.features.shellFeatures
     is_tangent_chain = False
     shell_feature_input = shell_feats.createInput(entities1, is_tangent_chain)
-    rib_thickness = ValueInput.createByString(rib_inset)
+    rib_thickness = ValueInput.createByReal(rib_inset)
     shell_feature_input.insideThickness = rib_thickness
     shell_feats.add(shell_feature_input)
 
@@ -213,11 +216,11 @@ def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from
     planes = component.constructionPlanes
 
     plane1_input = planes.createInput()
-    plane1_input.setByOffset(root_plane, ValueInput.createByString(dist_from_root))
+    plane1_input.setByOffset(root_plane, ValueInput.createByReal(dist_from_root))
     plane1 = planes.add(plane1_input)
 
     plane2_input = planes.createInput()
-    plane2_input.setByOffset(plane1, ValueInput.createByString(thickness))
+    plane2_input.setByOffset(plane1, ValueInput.createByReal(thickness))
     plane2 = planes.add(plane2_input)
 
     rib_body = boundary_fill_between_planes(component, comp_occurrence, wing_body, plane1, plane2)
