@@ -2,9 +2,26 @@ import doctest
 import math
 import os.path
 import unittest
+import re
 
 from adsk.core import Vector3D, Point3D, SurfaceTypes, Plane, ObjectCollection, Application
 from adsk.fusion import FeatureOperations
+
+
+def current_document_name(app):
+    """ returns the current document name with version information removed"""
+    return parse_document_name(app.activeDocument.name)
+
+
+def parse_document_name(n):
+    """
+    Parses an f360 document (drawing) name, stripping out any version information
+    >>> parse_document_name('example-undercambered-wing v9')
+    'example-undercambered-wing'
+    >>> parse_document_name('another test v3 wing v0')
+    'another test v3 wing'
+    """
+    return re.sub(' v[0-9]+$', '', n)
 
 
 def load_settings(user_parameters, user_parameter_name, ui):
