@@ -39,3 +39,12 @@ RIB_POST_WIDTH_CM = 0.1
 
 # length of side of the triangular pieces on top and bottom of rib posts
 RIB_POST_TRIANGLE_LEN_CM = 0.2
+
+# -----------------------------------------
+# settings for CreateSpars
+# -----------------------------------------
+SPARS_SKETCH = 'main_spar'
+SPARS_COMPONENT_NAME = 'spars'
+SPAR_THICKNESS_CM = 0.1
+SPAR_CIRCLE_DIAMETER_CM = 0.8
+SPAR_CIRCLE_SPACING_CM = 0.8

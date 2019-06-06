@@ -8,9 +8,9 @@ from functools import partial
 
 from adsk.core import Application, Matrix3D, ValueInput, Point3D, ObjectCollection
 from adsk.fusion import Design, Component, FeatureOperations
-from .orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
-from .utils import boundary_fill_between_planes, project_coord, load_settings
-from .utils import log_func
+from .f360lib.orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
+from .f360lib.utils import boundary_fill_between_planes, project_coord, load_settings
+from .f360lib.utils import log_func
 
 """
 Creates 3DLabprint-like spars on a wing solid.

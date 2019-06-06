@@ -7,12 +7,12 @@ from functools import partial
 
 from adsk.core import Application, Matrix3D, ValueInput, ObjectCollection, DocumentTypes
 from adsk.fusion import Design, Component, FeatureOperations
-from .orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
-from .orientation import vert_spanwise_plane, point, chordwise_coord
-from .utils import boundary_fill_between_planes, relative_location
-from .utils import load_settings
-from .utils import log_func
-from .utils import project_coord, centroid_of_bounding_box, find_coplanar_face
+from .f360lib.orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
+from .f360lib.orientation import vert_spanwise_plane, point, chordwise_coord
+from .f360lib.utils import boundary_fill_between_planes, relative_location
+from .f360lib.utils import load_settings
+from .f360lib.utils import log_func
+from .f360lib.utils import project_coord, centroid_of_bounding_box, find_coplanar_face
 
 app = Application.get()
 design = Design.cast(app.activeProduct)
