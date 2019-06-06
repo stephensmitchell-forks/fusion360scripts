@@ -30,6 +30,10 @@ def run(context):
         log('--------------------------------')
         log(dt.datetime.now(), __file__)
         log()
+        import os
+        for k,v in os.environ.items():
+            log(k,':',v)
+
         root = Component.cast(design.rootComponent)
 
         # locate the root sketch
