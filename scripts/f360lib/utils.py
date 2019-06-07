@@ -4,13 +4,28 @@ import os.path
 import unittest
 import re
 
-from adsk.core import Vector3D, Point3D, SurfaceTypes, Plane, ObjectCollection, Application
-from adsk.fusion import FeatureOperations
+from adsk.core import Vector3D, Point3D, SurfaceTypes, Plane, ObjectCollection, Application, Matrix3D
+from adsk.fusion import FeatureOperations, Component
+
+
+def item_by_name(collection, name):
+    item = collection.itemByName(name)
+    if item is None:
+        raise ValueError('No item named "{}" found in collection {}.'.format(name, collection))
+    return item
 
 
 def current_document_name(app):
     """ returns the current document name with version information removed"""
     return parse_document_name(app.activeDocument.name)
+
+
+def create_component(root, name):
+    """ creates a named component and returns this and the occurence instance. """
+    component_occurrence = root.occurrences.addNewComponent(Matrix3D.create())
+    component = Component.cast(component_occurrence.component)
+    component.name = name
+    return component, component_occurrence
 
 
 def parse_document_name(n):

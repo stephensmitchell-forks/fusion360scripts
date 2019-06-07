@@ -3,11 +3,62 @@ from adsk.fusion import FeatureOperations
 from .orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
 from .orientation import chordwise_coord, point
 from .orientation import vert_spanwise_plane
-from .utils import boundary_fill_between_planes
+from .utils import boundary_fill_between_planes, create_component, item_by_name
 from .utils import centroid_of_bounding_box
 from .utils import find_coplanar_face
 from .utils import project_coord
 from .utils import relative_location
+
+
+class RibCreator:
+    def __init__(self, root, component_name, root_sketch_name, wing_body_name):
+        # locate the root sketch & wing body
+        self.root_sketch = item_by_name(root.sketches, root_sketch_name)
+        self.wing_body = item_by_name(root.bRepBodies, wing_body_name)
+
+        # create new component
+        self.component, self.component_occurrence = create_component(root, component_name)
+
+    def create_rib(self, dist_from_root, rib_thickness, rib_inset, rib_name,
+                   rib_post_relative_positions, rib_post_width, rib_post_triangle_len):
+        root_plane = self.root_sketch.referencePlane
+
+        # Create rib body and return it and the 2 construction planes along each fact
+        rib_body, plane1, plane2 = create_rib_body(self.component, self.component_occurrence, self.wing_body,
+                                                   root_plane, dist_from_root,
+                                                   rib_thickness)
+        rib_body.name = rib_name
+
+        # find the chordwise extremities of the wing body
+        start_coord = chordwise_coord(rib_body.boundingBox.minPoint)
+        end_coord = chordwise_coord(rib_body.boundingBox.maxPoint)
+        rib_post_locs = [relative_location(start_coord, end_coord, frac) for frac in rib_post_relative_positions]
+
+        for i, rib_post_loc in enumerate(rib_post_locs):
+            post = create_rib_vertical_post(self.component, self.component_occurrence, self.wing_body, rib_body,
+                                            rib_post_loc, rib_post_width,
+                                            rib_post_triangle_len)
+            post.name = '{}_post_{}'.format(rib_name, i + 1)
+
+        # find the faces aligned with the construction planes
+        plane1_face = find_coplanar_face(rib_body, plane1)
+        plane2_face = find_coplanar_face(rib_body, plane2)
+        assert plane1_face is not None, 'plane1'
+        assert plane2_face is not None, 'plane2'
+
+        # use shell tool to remove center of rib, and the 2 faces
+        # Create a collection of entities for shell
+        entities1 = ObjectCollection.create()
+        entities1.add(plane1_face)
+        entities1.add(plane2_face)
+
+        # Create a shell feature
+        shell_feats = self.component.features.shellFeatures
+        is_tangent_chain = False
+        shell_feature_input = shell_feats.createInput(entities1, is_tangent_chain)
+        rib_thickness = ValueInput.createByReal(rib_inset)
+        shell_feature_input.insideThickness = rib_thickness
+        shell_feats.add(shell_feature_input)
 
 
 def create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root, thickness):
@@ -127,43 +178,3 @@ def create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, ri
         combines.add(combine_input)
 
     return post
-
-
-def create_rib(wing_body, root_sketch, component, comp_occurrence, dist_from_root, rib_thickness, rib_inset, rib_name,
-               rib_post_relative_positions, rib_post_width, rib_post_triangle_len):
-    root_plane = root_sketch.referencePlane
-
-    # Create rib body and return it and the 2 construction planes along each fact
-    rib_body, plane1, plane2 = create_rib_body(component, comp_occurrence, wing_body, root_plane, dist_from_root,
-                                               rib_thickness)
-    rib_body.name = rib_name
-
-    # find the chordwise extremities of the wing body
-    start_coord = chordwise_coord(rib_body.boundingBox.minPoint)
-    end_coord = chordwise_coord(rib_body.boundingBox.maxPoint)
-    rib_post_locs = [relative_location(start_coord, end_coord, frac) for frac in rib_post_relative_positions]
-
-    for i, rib_post_loc in enumerate(rib_post_locs):
-        post = create_rib_vertical_post(component, comp_occurrence, wing_body, rib_body, rib_post_loc, rib_post_width,
-                                        rib_post_triangle_len)
-        post.name = '{}_post_{}'.format(rib_name, i + 1)
-
-    # find the faces aligned with the construction planes
-    plane1_face = find_coplanar_face(rib_body, plane1)
-    plane2_face = find_coplanar_face(rib_body, plane2)
-    assert plane1_face is not None, 'plane1'
-    assert plane2_face is not None, 'plane2'
-
-    # use shell tool to remove center of rib, and the 2 faces
-    # Create a collection of entities for shell
-    entities1 = ObjectCollection.create()
-    entities1.add(plane1_face)
-    entities1.add(plane2_face)
-
-    # Create a shell feature
-    shell_feats = component.features.shellFeatures
-    is_tangent_chain = False
-    shell_feature_input = shell_feats.createInput(entities1, is_tangent_chain)
-    rib_thickness = ValueInput.createByReal(rib_inset)
-    shell_feature_input.insideThickness = rib_thickness
-    shell_feats.add(shell_feature_input)

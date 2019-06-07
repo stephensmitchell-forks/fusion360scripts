@@ -9,7 +9,7 @@ from functools import partial
 from adsk.core import Application, Matrix3D, ValueInput, Point3D, ObjectCollection
 from adsk.fusion import Design, Component, FeatureOperations
 from .f360lib.orientation import VERTICAL_UP_DIRECTION, SPANWISE_DIRECTION
-from .f360lib.utils import boundary_fill_between_planes, project_coord, load_settings
+from .f360lib.utils import boundary_fill_between_planes, project_coord, load_settings, item_by_name
 from .f360lib.utils import log_func
 
 """
@@ -129,15 +129,9 @@ def run(context):
 
         root = Component.cast(des.rootComponent)
 
-        # locate the spars sketch
-        sketch = root.sketches.itemByName(settings.SPARS_SKETCH)
-        if sketch is None:
-            raise ValueError('Sketch "{}" not found'.format(settings.SPARS_SKETCH))
-
-        # locate the wing body
-        wing_body = root.bRepBodies.itemByName(settings.WING_BODY)
-        if wing_body is None:
-            raise ValueError('Wing body "{}" not found'.format(settings.WING_BODY))
+        # locate the spars sketch & wing body
+        sketch = item_by_name(root.sketches, settings.SPARS_SKETCH)
+        wing_body = item_by_name(root.bRepBodies, settings.WING_BODY)
 
         # create new component
         component_occurrence = root.occurrences.addNewComponent(Matrix3D.create())
@@ -148,7 +142,8 @@ def run(context):
         lines = sketch.sketchCurves.sketchLines
         log('num lines:', lines.count)
         for i, line in enumerate(lines):
-            spar = create_spar_from_line(component, component_occurrence, wing_body, sketch, line, settings.SPAR_THICKNESS_CM)
+            spar = create_spar_from_line(component, component_occurrence, wing_body, sketch, line,
+                                         settings.SPAR_THICKNESS_CM)
             spar.name = "spar_{}".format(i + 1)
             log('Created spar', spar.name)
 
